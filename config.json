@@ -1,0 +1,18 @@
+{
+  "observeMs": 2000,
+  "maxPages": 50,
+  "scope": "path",
+  "ignoreHTTPSErrors": true,
+  "excludeRules": ["삭제", "탈퇴", "결제", "로그아웃"],
+  "login": {
+    "enabled": false,
+    "url": "",
+    "usernameSelector": "input[name='username'], input[name='id'], input[type='email']",
+    "passwordSelector": "input[name='password'], input[type='password']",
+    "submitSelector": "button[type='submit'], input[type='submit']",
+    "username": "",
+    "password": "",
+    "successIndicator": ""
+  },
+  "outputDir": "report"
+}

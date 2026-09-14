@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smoke — 자동 스모크 테스트</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  :root{
+    --ink:#141821;--ink-soft:#4a5162;--ink-faint:#8b91a0;--line:#e3e6ec;--bg:#f6f7f9;
+    --panel:#ffffff;--brand:#2f5bea;--brand-ink:#1b3aa0;--brand-bg:#eef2fe;
+    --pass:#1f9d6b;--pass-bg:#e6f5ee;--error:#d1435b;--error-bg:#fbe8ec;
+    --noresp:#c67a12;--noresp-bg:#fbf0dd;--excl:#7a8194;--excl-bg:#eef0f4;
+    --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --sans:'Inter',system-ui,-apple-system,'Malgun Gothic',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1220px;margin:0 auto;padding:0 20px}
+  button{font-family:inherit;cursor:pointer}
+
+  /* header */
+  header{background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+  .hbar{display:flex;align-items:center;gap:14px;height:60px}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;letter-spacing:-.02em}
+  .logo .dot{width:11px;height:11px;border-radius:3px;background:var(--brand);box-shadow:0 0 0 4px rgba(47,91,234,.14)}
+  .logo small{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-soft);background:var(--bg);padding:2px 7px;border-radius:5px;border:1px solid var(--line)}
+  .htail{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+
+  /* scan config */
+  .scanbar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin:20px 0}
+  .row1{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field.grow{flex:1;min-width:240px}
+  .field label{font-size:11px;font-weight:600;color:var(--ink-soft);font-family:var(--mono)}
+  .field input,.field select{border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:14px;color:var(--ink);background:#fdfdfe;font-family:inherit}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(47,91,234,.12)}
+  .btn-primary{background:var(--brand);color:#fff;border:none;border-radius:8px;padding:0 22px;height:40px;font-size:14px;font-weight:600;transition:.15s;white-space:nowrap}
+  .btn-primary:hover{background:var(--brand-ink)}
+  .btn-primary:disabled{opacity:.45;cursor:not-allowed}
+
+  .advanced{margin-top:14px;border-top:1px dashed var(--line);padding-top:14px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
+  .adv-group{display:flex;flex-direction:column;gap:6px}
+  .adv-group .gl{font-size:11px;font-weight:600;color:var(--ink-faint);font-family:var(--mono)}
+  .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{border:none;background:#fff;padding:7px 13px;font-size:12px;font-weight:600;color:var(--ink-soft);border-right:1px solid var(--line);transition:.12s}
+  .seg button:last-child{border-right:none}
+  .seg button.on{background:var(--brand);color:#fff}
+  .excl-input{border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12px;font-family:var(--mono);min-width:230px}
+  .tog{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-soft);cursor:pointer;user-select:none}
+  .tog input{accent-color:var(--brand);width:15px;height:15px}
+
+  .login-fields{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;display:none}
+  .login-fields.on{display:flex}
+  .login-fields .field input{font-size:13px}
+
+  /* progress */
+  .progress{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:20px;display:none}
+  .progress.on{display:block}
+  .ptop{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+  .ptop b{font-size:14px}.ptop span{font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .ptrack{height:7px;background:var(--bg);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+  .pfill{height:100%;width:0;background:linear-gradient(90deg,var(--brand),#5a7bf0);transition:width .3s ease}
+  .plog-list{margin-top:12px;display:flex;flex-direction:column;gap:4px;max-height:120px;overflow-y:auto}
+  .plog-item{font-family:var(--mono);font-size:11px;color:var(--ink-soft);padding:2px 0}
+  .plog-item.new{color:var(--ink)}
+
+  /* results */
+  .results{display:none}.results.on{display:block}
+
+  /* dashboard */
+  .dash{display:grid;grid-template-columns:1.1fr 1fr .9fr;gap:16px;margin-bottom:16px;margin-top:4px}
+  @media(max-width:900px){.dash{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .card h3{font-size:12px;font-family:var(--mono);color:var(--ink-soft);font-weight:600;margin-bottom:14px}
+  .passrate{display:flex;align-items:center;gap:20px}
+  .ring{position:relative;width:126px;height:126px;flex-shrink:0}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ring .val b{font-size:29px;font-weight:700;letter-spacing:-.02em}
+  .ring .val small{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
+  .breakdown{flex:1;display:flex;flex-direction:column;gap:8px}
+  .brow{display:flex;align-items:center;gap:9px;font-size:13px}
+  .brow .sw{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+  .brow .nm{color:var(--ink-soft)}.brow .ct{margin-left:auto;font-family:var(--mono);font-weight:600}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .stat{border:1px solid var(--line);border-radius:10px;padding:12px 13px;position:relative;overflow:hidden}
+  .stat .n{font-size:24px;font-weight:700;letter-spacing:-.02em;font-family:var(--mono)}
+  .stat .l{font-size:11px;color:var(--ink-soft);margin-top:2px}
+  .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+  .stat.pass::before{background:var(--pass)}.stat.pass .n{color:var(--pass)}
+  .stat.error::before{background:var(--error)}.stat.error .n{color:var(--error)}
+  .stat.noresp::before{background:var(--noresp)}.stat.noresp .n{color:var(--noresp)}
+  .stat.excl::before{background:var(--excl)}.stat.excl .n{color:var(--excl)}
+  .pagecov{display:flex;flex-direction:column;gap:9px;max-height:180px;overflow-y:auto}
+  .pgbar{display:flex;flex-direction:column;gap:4px}
+  .pgbar .top{display:flex;justify-content:space-between;font-size:12px}
+  .pgbar .top .p{font-family:var(--mono);color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+  .pgbar .top .c{font-family:var(--mono);font-weight:600;font-size:11px}
+  .pgtrack{height:6px;border-radius:99px;overflow:hidden;display:flex;background:var(--bg)}
+  .pgtrack i{display:block;height:100%}
+
+  /* toolbar */
+  .toolbar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .filters{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:6px 13px;font-size:12px;font-weight:600;color:var(--ink-soft);font-family:var(--mono);transition:.12s}
+  .chip:hover{border-color:var(--brand)}
+  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .chip.active[data-f="ERROR"]{background:var(--error);border-color:var(--error)}
+  .chip.active[data-f="NO-RESPONSE"]{background:var(--noresp);border-color:var(--noresp)}
+  .chip.active[data-f="PASS"]{background:var(--pass);border-color:var(--pass)}
+  .search{border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:13px;min-width:170px;font-family:var(--mono)}
+  .search:focus{outline:none;border-color:var(--brand)}
+  .exports{margin-left:auto;display:flex;gap:7px}
+  .btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 13px;font-size:13px;font-weight:600;transition:.12s;display:inline-flex;align-items:center;gap:5px}
+  .btn-ghost:hover{border-color:var(--brand);color:var(--brand-ink)}
+
+  /* list */
+  .list{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:40px}
+  .grphead{background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:10px}
+  .grphead .u{color:var(--ink-soft);font-weight:500}
+  .grphead .mini{margin-left:auto;display:flex;gap:5px}
+  .lhead,.lrow{display:grid;grid-template-columns:96px 62px 1fr 1.3fr 96px;gap:12px;align-items:center;padding:11px 16px}
+  .lhead{background:#fbfcfd;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink-faint)}
+  .lrow{border-bottom:1px solid var(--line);font-size:13px;cursor:pointer;transition:.1s}
+  .lrow:last-child{border-bottom:none}
+  .lrow:hover{background:#fafbfc}
+  .badge{font-family:var(--mono);font-size:10px;font-weight:700;padding:4px 7px;border-radius:6px;text-align:center}
+  .badge.PASS{background:var(--pass-bg);color:var(--pass)}
+  .badge.ERROR{background:var(--error-bg);color:var(--error)}
+  .badge.NO-RESPONSE{background:var(--noresp-bg);color:var(--noresp)}
+  .badge.EXCLUDED,.badge.UNCLICKABLE{background:var(--excl-bg);color:var(--excl)}
+  .sev{font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 6px;border-radius:5px;text-align:center;border:1px solid}
+  .sev.P1{color:var(--error);border-color:var(--error)}
+  .sev.P2{color:var(--noresp);border-color:var(--noresp)}
+  .sev.--{color:var(--ink-faint);border-color:var(--line);opacity:.5}
+  .el-label{font-weight:600}
+  .el-loc{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .signals{display:flex;gap:4px;flex-wrap:wrap}
+  .sig{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:4px;background:var(--bg);border:1px solid var(--line);color:var(--ink-soft)}
+  .sig.hit{background:var(--pass-bg);color:var(--pass);border-color:transparent}
+  .sig.miss{background:#fff;color:#c3c8d2;text-decoration:line-through}
+  .sig.err{background:var(--error-bg);color:var(--error);border-color:transparent}
+  .repro{font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+  .empty{padding:44px;text-align:center;color:var(--ink-soft);font-size:13px}
+
+  /* drawer */
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:92vw;background:var(--panel);border-left:1px solid var(--line);box-shadow:-8px 0 30px rgba(0,0,0,.08);transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:40;display:flex;flex-direction:column}
+  .drawer.on{transform:translateX(0)}
+  .dhead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:12px}
+  .dhead .x{margin-left:auto;background:var(--bg);border:1px solid var(--line);border-radius:7px;width:30px;height:30px;font-size:16px;color:var(--ink-soft);flex-shrink:0}
+  .dbody{padding:20px;overflow-y:auto;flex:1}
+  .dsec{margin-bottom:20px}
+  .dsec .t{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink-faint);margin-bottom:8px}
+  .kv{display:flex;gap:8px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--bg)}
+  .kv .k{color:var(--ink-soft);min-width:90px;font-family:var(--mono);font-size:11px}
+  .kv .v{font-weight:500;word-break:break-all}
+  .code{background:#141821;color:#c7d0e0;font-family:var(--mono);font-size:12px;padding:11px 13px;border-radius:8px;position:relative;line-height:1.7;word-break:break-all}
+  .code .cp{position:absolute;top:8px;right:8px;background:#2a3142;color:#9aa4b8;border:none;border-radius:5px;padding:3px 8px;font-size:10px;font-family:var(--mono)}
+  .dfoot{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:8px}
+  .dfoot button{flex:1}
+  .overlay{position:fixed;inset:0;background:rgba(20,24,33,.3);opacity:0;pointer-events:none;transition:.28s;z-index:35}
+  .overlay.on{opacity:1;pointer-events:auto}
+
+  /* error banner */
+  .err-banner{background:var(--error-bg);border:1px solid var(--error);color:var(--error);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:13px;display:none}
+  .err-banner.on{display:block}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:9px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60;font-weight:500}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  footer{text-align:center;padding:26px;font-family:var(--mono);font-size:11px;color:#a7adba}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap hbar">
+    <div class="logo"><span class="dot"></span>Smoke <small>auto smoke-test</small></div>
+    <div class="htail" id="clock">ready</div>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- scan config -->
+  <div class="scanbar">
+    <div class="row1">
+      <div class="field grow">
+        <label>대상 URL — 공개 웹사이트 URL</label>
+        <input id="url" placeholder="https://example.com" spellcheck="false">
+      </div>
+      <button class="btn-primary" id="runBtn" onclick="startScan()">스캔 시작</button>
+    </div>
+    <div class="advanced">
+      <div class="adv-group">
+        <span class="gl">스캔 범위</span>
+        <div class="seg" id="scopeSeg">
+          <button data-s="page">현재 페이지</button>
+          <button data-s="path" class="on">경로 하위</button>
+          <button data-s="domain">도메인 전체</button>
+        </div>
+      </div>
+      <div class="adv-group">
+        <span class="gl">관찰 대기(ms)</span>
+        <input id="observeMs" type="number" value="2000" style="width:90px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:13px">
+      </div>
+      <div class="adv-group" style="flex:1;min-width:220px">
+        <span class="gl">제외 규칙 (파괴적 동작)</span>
+        <input class="excl-input" id="exclInput" value="삭제, 탈퇴, 결제, 로그아웃" spellcheck="false">
+      </div>
+      <div class="adv-group">
+        <span class="gl">로그인</span>
+        <label class="tog"><input type="checkbox" id="loginToggle" onchange="toggleLogin()"> 로그인 사용</label>
+        <div class="login-fields" id="loginFields">
+          <div class="field"><label>로그인 URL</label><input id="loginUrl" placeholder="https://example.com/login" style="width:200px"></div>
+          <div class="field"><label>아이디</label><input id="loginId" style="width:120px"></div>
+          <div class="field"><label>비밀번호</label><input id="loginPw" type="password" style="width:120px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- error banner -->
+  <div class="err-banner" id="errBanner"></div>
+
+  <!-- progress -->
+  <div class="progress" id="prog">
+    <div class="ptop"><b id="pstage">준비 중…</b><span id="pcount"></span></div>
+    <div class="ptrack"><div class="pfill" id="pfill"></div></div>
+    <div class="plog-list" id="plogList"></div>
+  </div>
+
+  <!-- results -->
+  <div class="results" id="res">
+    <div class="dash">
+      <div class="card">
+        <h3>PASS RATE</h3>
+        <div class="passrate">
+          <div class="ring">
+            <svg width="126" height="126">
+              <circle cx="63" cy="63" r="54" fill="none" stroke="#eef0f4" stroke-width="13"/>
+              <circle id="ringfill" cx="63" cy="63" r="54" fill="none" stroke="var(--pass)" stroke-width="13" stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3" style="transition:stroke-dashoffset 1s ease"/>
+            </svg>
+            <div class="val"><b id="rateNum">0%</b><small>passed</small></div>
+          </div>
+          <div class="breakdown" id="breakdown"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>결함 집계</h3>
+        <div class="stats">
+          <div class="stat pass"><div class="n" id="cPass">0</div><div class="l">정상 PASS</div></div>
+          <div class="stat error"><div class="n" id="cError">0</div><div class="l">에러 ERROR</div></div>
+          <div class="stat noresp"><div class="n" id="cNoresp">0</div><div class="l">무감 NO-RESPONSE</div></div>
+          <div class="stat excl"><div class="n" id="cExcl">0</div><div class="l">제외 EXCLUDED</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>페이지별 커버리지 <span style="font-family:var(--mono);font-weight:500;color:var(--ink-faint);font-size:11px" id="pgCount"></span></h3>
+        <div class="pagecov" id="pagecov"></div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filters">
+        <button class="chip active" data-f="ALL" onclick="setFilter('ALL')">전체</button>
+        <button class="chip" data-f="ERROR" onclick="setFilter('ERROR')">에러</button>
+        <button class="chip" data-f="NO-RESPONSE" onclick="setFilter('NO-RESPONSE')">무감</button>
+        <button class="chip" data-f="PASS" onclick="setFilter('PASS')">정상</button>
+        <button class="chip" data-f="EXCLUDED" onclick="setFilter('EXCLUDED')">제외</button>
+      </div>
+      <input class="search" id="search" placeholder="요소·페이지 검색" oninput="renderRows()">
+      <div class="exports">
+        <button class="btn-ghost" onclick="exportHTML()">HTML</button>
+        <button class="btn-ghost" onclick="exportExcel()">Excel</button>
+        <button class="btn-ghost" onclick="window.print()">PDF</button>
+      </div>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+
+<!-- drawer -->
+<div class="overlay" id="overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="dhead">
+    <div>
+      <div id="dTitle" style="font-weight:700;font-size:16px">—</div>
+      <div id="dSub" style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:3px">—</div>
+    </div>
+    <button class="x" onclick="closeDrawer()">×</button>
+  </div>
+  <div class="dbody" id="dBody"></div>
+  <div class="dfoot">
+    <button class="btn-ghost" style="justify-content:center" onclick="copySelector()">Selector 복사</button>
+    <button class="btn-primary" style="height:auto;padding:10px 0;border-radius:8px" onclick="copyTicket()">이슈 티켓 복사</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<footer>Smoke · 자동 스모크 테스트 플랫폼 · Playwright 기반</footer>
+
+<script>
+const SIGLABEL = { dom:'DOM', net:'NET', url:'URL', console:'CON' };
+const STCOLOR = { PASS:'var(--pass)', ERROR:'var(--error)', 'NO-RESPONSE':'var(--noresp)', EXCLUDED:'var(--excl)', UNCLICKABLE:'var(--excl)' };
+const STBG = { PASS:'var(--pass-bg)', ERROR:'var(--error-bg)', 'NO-RESPONSE':'var(--noresp-bg)', EXCLUDED:'var(--excl-bg)', UNCLICKABLE:'var(--excl-bg)' };
+
+let DATA = [], filter = 'ALL', current = null, scanMeta = {}, pageCount = 0;
+const $ = id => document.getElementById(id);
+const socket = io();
+
+// scope 선택
+let scope = 'path';
+$('scopeSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  scope = b.dataset.s;
+  [...$('scopeSeg').children].forEach(x => x.classList.toggle('on', x === b));
+});
+
+function toggleLogin() {
+  $('loginFields').classList.toggle('on', $('loginToggle').checked);
+}
+
+function toast(m) {
+  const t = $('toast'); t.textContent = m; t.classList.add('on');
+  setTimeout(() => t.classList.remove('on'), 2000);
+}
+
+function addLog(msg, isNew = false) {
+  const el = document.createElement('div');
+  el.className = 'plog-item' + (isNew ? ' new' : '');
+  el.textContent = '› ' + msg;
+  const list = $('plogList');
+  list.appendChild(el);
+  list.scrollTop = list.scrollHeight;
+  // 이전 로그는 faint 처리
+  [...list.querySelectorAll('.plog-item.new')].slice(0, -1).forEach(x => x.classList.remove('new'));
+}
+
+// ─── 스캔 시작 ───
+async function startScan() {
+  const url = $('url').value.trim();
+  if (!url) { toast('URL을 입력하세요'); return; }
+
+  DATA = []; filter = 'ALL'; pageCount = 0;
+  $('runBtn').disabled = true;
+  $('res').classList.remove('on');
+  $('errBanner').classList.remove('on');
+  $('prog').classList.add('on');
+  $('pfill').style.width = '0%';
+  $('plogList').innerHTML = '';
+  $('pstage').textContent = '연결 중…';
+  $('pcount').textContent = '';
+
+  const excludeRules = $('exclInput').value.split(',').map(s => s.trim()).filter(Boolean);
+  const observeMs = parseInt($('observeMs').value) || 2000;
+  const loginEnabled = $('loginToggle').checked;
+  const login = loginEnabled ? {
+    enabled: true,
+    url: $('loginUrl').value.trim(),
+    username: $('loginId').value.trim(),
+    password: $('loginPw').value,
+    usernameSelector: "input[name='username'], input[name='id'], input[type='email']",
+    passwordSelector: "input[name='password'], input[type='password']",
+    submitSelector: "button[type='submit'], input[type='submit']",
+  } : { enabled: false };
+
+  const res = await fetch('/api/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, scope, login, excludeRules, observeMs }),
+  });
+  const { scanId } = await res.json();
+  socket.emit('join', scanId);
+  addLog('스캔 시작: ' + url, true);
+}
+
+// ─── Socket 이벤트 ───
+socket.on('log', ({ msg }) => {
+  addLog(msg, true);
+  $('pstage').textContent = msg;
+});
+
+socket.on('page', ({ url }) => {
+  pageCount++;
+  $('pstage').textContent = `[${pageCount}] ${url}`;
+  addLog(`페이지 스캔: ${url}`, true);
+  $('pfill').style.width = Math.min(90, pageCount * 10) + '%';
+  $('pcount').textContent = pageCount + ' 페이지';
+});
+
+socket.on('pageResult', ({ url, count }) => {
+  addLog(`  → ${count}개 요소`, false);
+});
+
+socket.on('done', ({ results, meta }) => {
+  DATA = results;
+  scanMeta = meta;
+  $('prog').classList.remove('on');
+  $('runBtn').disabled = false;
+  $('pfill').style.width = '100%';
+  $('clock').textContent = 'scan complete · ' + meta.scannedAt;
+  render();
+  $('res').classList.add('on');
+  window.scrollTo({ top: $('res').offsetTop - 80, behavior: 'smooth' });
+});
+
+socket.on('error', ({ msg }) => {
+  $('prog').classList.remove('on');
+  $('runBtn').disabled = false;
+  $('errBanner').textContent = '오류: ' + msg;
+  $('errBanner').classList.add('on');
+});
+
+// ─── 집계 ───
+function counts(list) {
+  const c = { PASS:0, ERROR:0, 'NO-RESPONSE':0, EXCLUDED:0, UNCLICKABLE:0 };
+  (list || DATA).forEach(d => { c[d.status] = (c[d.status]||0)+1; });
+  return c;
+}
+function severity(d) {
+  if (d.status === 'ERROR') return 'P1';
+  if (d.status === 'NO-RESPONSE') return 'P2';
+  return '--';
+}
+function reproText(d) {
+  if (d.reason) return d.reason;
+  if (d.status === 'NO-RESPONSE') return '클릭 후 무변화';
+  if (d.status === 'ERROR') return d.signals?.console ? 'JS 예외 발생' : '서버 4xx/5xx';
+  if (d.status === 'PASS') {
+    const hits = [];
+    if (d.signals?.dom) hits.push('DOM');
+    if (d.signals?.net) hits.push('NET');
+    if (d.signals?.url) hits.push('URL');
+    return hits.join('+') + ' 변화';
+  }
+  return '';
+}
+
+// ─── 렌더 ───
+function render() {
+  const c = counts();
+  $('cPass').textContent = c.PASS;
+  $('cError').textContent = c.ERROR;
+  $('cNoresp').textContent = c['NO-RESPONSE'];
+  $('cExcl').textContent = (c.EXCLUDED||0) + (c.UNCLICKABLE||0);
+  const tested = c.PASS + c.ERROR + c['NO-RESPONSE'];
+  const rate = tested ? Math.round(c.PASS / tested * 100) : 0;
+  $('rateNum').textContent = rate + '%';
+  const circ = 339.3;
+  $('ringfill').style.strokeDashoffset = circ - (circ * rate / 100);
+  $('ringfill').style.stroke = rate >= 80 ? 'var(--pass)' : rate >= 50 ? 'var(--noresp)' : 'var(--error)';
+  $('breakdown').innerHTML = [['정상','var(--pass)',c.PASS],['에러','var(--error)',c.ERROR],['무감','var(--noresp)',c['NO-RESPONSE']],['제외','var(--excl)',c.EXCLUDED]]
+    .map(([nm,color,ct]) => `<div class="brow"><span class="sw" style="background:${color}"></span><span class="nm">${nm}</span><span class="ct">${ct}</span></div>`).join('');
+  renderCoverage();
+  renderRows();
+}
+
+function pages() { return [...new Set(DATA.map(d => d.page))]; }
+
+function renderCoverage() {
+  const pg = pages();
+  $('pgCount').textContent = pg.length + ' pages';
+  $('pagecov').innerHTML = pg.map(p => {
+    const items = DATA.filter(d => d.page === p);
+    const c = counts(items); const tot = items.length;
+    const seg = ['PASS','ERROR','NO-RESPONSE','EXCLUDED'].map(s =>
+      c[s] ? `<i style="width:${c[s]/tot*100}%;background:${STCOLOR[s]}"></i>` : ''
+    ).join('');
+    const bad = c.ERROR + c['NO-RESPONSE'];
+    return `<div class="pgbar"><div class="top"><span class="p">${esc(p)}</span><span class="c" style="color:${bad?'var(--error)':'var(--pass)'}">${bad ? bad+' 결함' : 'clean'}</span></div><div class="pgtrack">${seg}</div></div>`;
+  }).join('');
+}
+
+function sigHtml(d) {
+  if (d.status === 'EXCLUDED' || d.status === 'UNCLICKABLE') return '<span class="sig">—</span>';
+  return Object.entries(SIGLABEL).map(([k,label]) => {
+    const v = d.signals?.[k];
+    const cls = (k==='console' && v && d.status==='ERROR') ? 'err' : (v ? 'hit' : 'miss');
+    return `<span class="sig ${cls}">${label}</span>`;
+  }).join('');
+}
+
+function rowHtml(d, idx) {
+  const sev = severity(d);
+  return `<div class="lrow" onclick="openDrawer(${idx})">
+    <div><span class="badge ${d.status}">${d.status}</span></div>
+    <div><span class="sev ${sev}">${sev}</span></div>
+    <div><div class="el-label">${esc(d.label)}</div><div class="el-loc">${esc(d.sel)}</div></div>
+    <div class="signals">${sigHtml(d)}</div>
+    <div class="repro">${esc(reproText(d))}</div>
+  </div>`;
+}
+
+function filtered() {
+  const q = $('search').value.trim().toLowerCase();
+  return DATA.map((d,i) => ({...d,_idx:i})).filter(d => {
+    if (filter !== 'ALL' && d.status !== filter) return false;
+    if (q && !(d.label.toLowerCase().includes(q) || d.sel.toLowerCase().includes(q) || (d.page||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function renderRows() {
+  const rows = filtered();
+  if (!rows.length) { $('list').innerHTML = '<div class="empty">해당 조건의 결과가 없습니다.</div>'; return; }
+  const pg = [...new Set(rows.map(d => d.page))];
+  const headHtml = '<div class="lhead"><div>상태</div><div>심각도</div><div>요소</div><div>감지 신호</div><div>재현</div></div>';
+  $('list').innerHTML = pg.map(p => {
+    const items = rows.filter(d => d.page === p);
+    const c = counts(items);
+    const mini = ['PASS','ERROR','NO-RESPONSE','EXCLUDED'].filter(s=>c[s]).map(s =>
+      `<span style="background:${STBG[s]};color:${STCOLOR[s]};padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700">${c[s]}</span>`
+    ).join('');
+    return `<div class="grphead">📄 <span>${esc(p)}</span><span class="u">· ${items.length}개 요소</span><div class="mini">${mini}</div></div>`
+      + headHtml + items.map(d => rowHtml(d, d._idx)).join('');
+  }).join('');
+}
+
+function setFilter(f) {
+  filter = f;
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.f === f));
+  renderRows();
+}
+
+// ─── 드로어 ───
+function openDrawer(idx) {
+  const d = DATA[idx]; current = d;
+  $('dTitle').textContent = d.label;
+  $('dSub').textContent = (d.page||'') + '  ' + d.sel;
+  const sev = severity(d);
+  const sigRows = (d.status !== 'EXCLUDED' && d.status !== 'UNCLICKABLE')
+    ? `<div class="dsec"><div class="t">감지 신호</div><div class="signals">${Object.entries(SIGLABEL).map(([k,label])=>{const v=d.signals?.[k];const cls=(k==='console'&&v&&d.status==='ERROR')?'err':(v?'hit':'miss');return `<span class="sig ${cls}">${label} ${v?'✓':'✗'}</span>`}).join('')}</div></div>` : '';
+  $('dBody').innerHTML = `
+    <div class="dsec"><div class="t">판정</div>
+      <div class="kv"><span class="k">상태</span><span class="v"><span class="badge ${d.status}">${d.status}</span></span></div>
+      <div class="kv"><span class="k">심각도</span><span class="v">${sev}</span></div>
+      <div class="kv"><span class="k">페이지</span><span class="v">${esc(d.page||'')}</span></div>
+      <div class="kv"><span class="k">증상</span><span class="v">${esc(reproText(d))}</span></div>
+    </div>
+    ${sigRows}
+    <div class="dsec"><div class="t">Selector</div><div class="code">${esc(d.sel)}<button class="cp" onclick="copySelector()">copy</button></div></div>
+  `;
+  $('drawer').classList.add('on'); $('overlay').classList.add('on');
+}
+function closeDrawer() { $('drawer').classList.remove('on'); $('overlay').classList.remove('on'); }
+function copySelector() { if (!current) return; navigator.clipboard?.writeText(current.sel); toast('Selector 복사됨'); }
+function copyTicket() {
+  if (!current) return;
+  const sev = severity(current);
+  const t = `[${current.status}/${sev}] ${current.label} — ${current.page}\nSelector: ${current.sel}\n증상: ${reproText(current)}`;
+  navigator.clipboard?.writeText(t); toast('이슈 티켓 형식으로 복사됨');
+}
+
+// ─── 유틸 ───
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ─── Export ───
+function exportExcel() {
+  const c = counts();
+  const tested = c.PASS + c.ERROR + c['NO-RESPONSE'];
+  const pg = pages();
+  const summary = [['항목','값'],['URL',scanMeta.url||''],['검사 시각',scanMeta.scannedAt||''],['스캔 범위',scanMeta.scope||''],
+    ['페이지 수',pg.length],['총 요소',DATA.length],['PASS',c.PASS],['ERROR',c.ERROR],['NO-RESPONSE',c['NO-RESPONSE']],['EXCLUDED',c.EXCLUDED],
+    ['Pass율',(tested?Math.round(c.PASS/tested*100):0)+'%'],['소요 시간',(scanMeta.elapsed||'')+' s']];
+  const detail = [['페이지','상태','심각도','요소','Selector','DOM','NET','URL','CON','증상']];
+  DATA.forEach(d => detail.push([d.page,d.status,severity(d),d.label,d.sel,d.signals?.dom??'',d.signals?.net??'',d.signals?.url??'',d.signals?.console??'',reproText(d)]));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), '요약');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detail), '상세');
+  XLSX.writeFile(wb, 'smoke-report.xlsx');
+  toast('Excel 저장됨');
+}
+
+function exportHTML() {
+  const c = counts(); const tested = c.PASS + c.ERROR + c['NO-RESPONSE']; const rate = tested ? Math.round(c.PASS/tested*100) : 0;
+  const rowsHtml = DATA.map(d => `<tr><td>${esc(d.page)}</td><td>${d.status}</td><td>${severity(d)}</td><td>${esc(d.label)}</td><td>${esc(d.sel)}</td><td>${esc(reproText(d))}</td></tr>`).join('');
+  const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>Smoke Report</title>
+<style>body{font-family:system-ui,sans-serif;padding:30px;color:#141821}h1{font-size:20px;margin-bottom:16px}
+.sum{margin-bottom:20px;font-size:14px;display:flex;flex-wrap:wrap;gap:16px}.sum div{background:#f6f7f9;padding:8px 14px;border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #e3e6ec;padding:8px 10px;text-align:left}th{background:#f6f7f9}</style></head>
+<body><h1>자동 스모크 테스트 리포트</h1>
+<div class="sum"><div><b>URL</b><br>${esc(scanMeta.url||'')}</div><div><b>검사 시각</b><br>${esc(scanMeta.scannedAt||'')}</div>
+<div><b>Pass율</b><br>${rate}%</div><div><b>집계</b><br>PASS ${c.PASS} / ERROR ${c.ERROR} / NO-RESPONSE ${c['NO-RESPONSE']} / EXCLUDED ${c.EXCLUDED}</div></div>
+<table><thead><tr><th>페이지</th><th>상태</th><th>심각도</th><th>요소</th><th>Selector</th><th>증상</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+</body></html>`;
+  const blob = new Blob([html], {type:'text/html'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'smoke-report.html'; a.click();
+  toast('HTML 저장됨');
+}
+</script>
+</body>
+</html>

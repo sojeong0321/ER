@@ -1,0 +1,104 @@
+[
+  {
+    "label": "저장 (정상-DOM)",
+    "sel": "button#btn-dom",
+    "status": "PASS",
+    "signals": {
+      "dom": 1,
+      "net": 0,
+      "url": 0,
+      "console": 0
+    }
+  },
+  {
+    "label": "동기화 (정상-NET)",
+    "sel": "button#btn-net",
+    "status": "PASS",
+    "signals": {
+      "dom": 1,
+      "net": 0,
+      "url": 0,
+      "console": 0
+    }
+  },
+  {
+    "label": "엑셀 다운로드 (에러-500)",
+    "sel": "button#btn-500",
+    "status": "ERROR",
+    "signals": {
+      "dom": 0,
+      "net": 1,
+      "url": 0,
+      "console": 1
+    }
+  },
+  {
+    "label": "상세보기 (정상-URL)",
+    "sel": "button#btn-url",
+    "status": "PASS",
+    "signals": {
+      "dom": 0,
+      "net": 0,
+      "url": 1,
+      "console": 0
+    }
+  },
+  {
+    "label": "필터 초기화 (무감-핸들러없음)",
+    "sel": "button#btn-dead1",
+    "status": "NO-RESPONSE",
+    "signals": {
+      "dom": 0,
+      "net": 0,
+      "url": 0,
+      "console": 0
+    }
+  },
+  {
+    "label": "정렬 변경 (무감-빈핸들러)",
+    "sel": "button#btn-dead2",
+    "status": "NO-RESPONSE",
+    "signals": {
+      "dom": 0,
+      "net": 0,
+      "url": 0,
+      "console": 0
+    }
+  },
+  {
+    "label": "미리보기 (에러-예외)",
+    "sel": "button#btn-error",
+    "status": "ERROR",
+    "signals": {
+      "dom": 0,
+      "net": 0,
+      "url": 0,
+      "console": 1
+    }
+  },
+  {
+    "label": "지연 로딩 (정상-비동기)",
+    "sel": "button#btn-async",
+    "status": "PASS",
+    "signals": {
+      "dom": 1,
+      "net": 0,
+      "url": 0,
+      "console": 0
+    }
+  },
+  {
+    "label": "삭제 (제외대상)",
+    "sel": "button#btn-delete",
+    "status": "EXCLUDED",
+    "reason": "제외 규칙 매칭",
+    "signals": {}
+  },
+  {
+    "label": "이전 (disabled)",
+    "sel": "button#btn-disabled",
+    "status": "EXCLUDED",
+    "reason": "disabled 요소",
+    "signals": {}
+  }
+]

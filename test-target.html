@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>QA 테스트 대상 페이지</title></head>
+<body>
+<h1>셀러 상품 관리 (테스트용)</h1>
+<div id="output"></div>
+
+<!-- 1. 정상: DOM 변경 -->
+<button id="btn-dom" onclick="document.getElementById('output').innerHTML='<p>저장되었습니다</p>'">저장 (정상-DOM)</button>
+
+<!-- 2. 정상: 정상 네트워크 요청 (data URL로 200 응답 보장) -->
+<button id="btn-net" onclick="fetch('data:text/plain,ok').then(r=>r.text()).then(()=>{document.getElementById('output').innerHTML='<p>동기화 완료</p>'})">동기화 (정상-NET)</button>
+
+<!-- 2b. 에러: 서버 4xx/5xx 응답 (실제 서버 에러) -->
+<button id="btn-500" onclick="fetch('https://httpstat.us/500')">엑셀 다운로드 (에러-500)</button>
+
+<!-- 3. 정상: URL 변경 (해시 라우팅) -->
+<button id="btn-url" onclick="location.hash='#detail'">상세보기 (정상-URL)</button>
+
+<!-- 4. 무감: onClick 자체가 없음 (핸들러 미연결) -->
+<button id="btn-dead1">필터 초기화 (무감-핸들러없음)</button>
+
+<!-- 5. 무감: 핸들러는 있으나 아무것도 안 함 -->
+<button id="btn-dead2" onclick="void(0)">정렬 변경 (무감-빈핸들러)</button>
+
+<!-- 6. 에러: 콘솔 예외 발생 -->
+<button id="btn-error" onclick="nonExistentFunction()">미리보기 (에러-예외)</button>
+
+<!-- 7. 정상이지만 비동기 지연(1.2초 후 반응) -->
+<button id="btn-async" onclick="setTimeout(()=>{document.getElementById('output').innerHTML='<p>지연 로딩 완료</p>'},1200)">지연 로딩 (정상-비동기)</button>
+
+<!-- 8. 제외 대상: 파괴적 동작 -->
+<button id="btn-delete" onclick="document.getElementById('output').innerHTML='삭제됨'">삭제 (제외대상)</button>
+
+<!-- 9. disabled: 검사 제외 -->
+<button id="btn-disabled" disabled onclick="alert('x')">이전 (disabled)</button>
+</body>
+</html>
