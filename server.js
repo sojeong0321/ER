@@ -28,7 +28,8 @@ app.post('/api/scan', (req, res) => {
   scans.set(scanId, { status: 'running' });
   res.json({ scanId });
 
-  runScan(scanId, { url, scope: scope || 'path', login, excludeRules, observeMs });
+  // 클라이언트가 소켓 룸에 join할 시간 확보
+  setTimeout(() => runScan(scanId, { url, scope: scope || 'path', login, excludeRules, observeMs }), 400);
 });
 
 app.get('/api/report/:scanId', (req, res) => {
