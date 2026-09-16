@@ -104,7 +104,7 @@ node server.js
 
 <div align="center">
 
-made with 🩺 &nbsp;by a **QA couple**
+made with 🩺
 <br>
 <sub>아픈 버튼은 저희가 응급실로 데려갈게요.</sub>
 
