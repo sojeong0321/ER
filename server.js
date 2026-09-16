@@ -391,7 +391,10 @@ async function runScan(scanId, options) {
 
     const results = await crawl(browser, url, scope, ev => {
       if (ev.type === 'page') emit('page', { url: ev.url, visited: ev.visited, queued: ev.queued });
-      if (ev.type === 'element') emit('element', { url: ev.url, index: ev.index, total: ev.total, status: ev.result.status });
+      if (ev.type === 'element') emit('element', {
+        url: ev.url, index: ev.index, total: ev.total,
+        status: ev.result.status, label: ev.result.label, sel: ev.result.sel, reason: ev.result.reason,
+      });
       if (ev.type === 'done') emit('pageResult', { url: ev.url, count: ev.count });
       if (ev.type === 'pageError') emit('log', { msg: `접근 실패: ${ev.url} — ${ev.msg}` });
       if (ev.type === 'limit') emit('log', { msg: `최대 페이지 수(${ev.max}) 도달 — ${ev.skipped}개 페이지를 건너뜁니다.` });
