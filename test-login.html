@@ -15,6 +15,7 @@
   - 아이디 칸에 name·id 가 없다
   - form 태그가 없다
   - OTP 입력칸이 아이디·비밀번호와 같은 화면에 있다
+  - 세 칸이 모두 채워져야 로그인 버튼이 풀린다 (채우자마자 누르면 비활성 버튼을 누르게 된다)
   이 조건에서 자동 로그인이 되는지 test/verify-login.js 가 검증한다.
 -->
 <h1>D-TEST 로그인</h1>
@@ -23,11 +24,20 @@
 <input type="text" placeholder="아이디">
 <input type="password" id="password" placeholder="비밀번호">
 <input type="text" placeholder="OTP">
-<button class="loginBtn">로그인</button>
+<button class="loginBtn" disabled>로그인</button>
 <div id="msg"></div>
 
 <script>
-  document.querySelector('.loginBtn').addEventListener('click', async () => {
+  // 실제 사내 시스템처럼, 세 칸이 다 채워지기 전에는 로그인 버튼을 잠가 둔다.
+  // 화면이 입력을 반영하는 데 걸리는 시간(80ms)도 흉내 낸다.
+  const btn = document.querySelector('.loginBtn');
+  const fields = [...document.querySelectorAll('input')];
+  const sync = () => setTimeout(() => {
+    btn.disabled = !fields.every(f => f.value.trim());
+  }, 80);
+  fields.forEach(f => { f.addEventListener('input', sync); f.addEventListener('change', sync); });
+
+  btn.addEventListener('click', async () => {
     const [idEl, otpEl] = document.querySelectorAll('input[type=text]');
     const res = await fetch('/api/_test/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

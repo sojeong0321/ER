@@ -185,6 +185,7 @@ async function fillOtp(page, otpValue, log) {
   }
 
   await page.fill(sel, code);
+  await page.waitForTimeout(200);   // OTP 입력으로 버튼이 풀리기까지의 틈
   log?.(kind === 'fixed' ? 'OTP 코드를 입력했습니다.' : 'OTP 코드를 만들어 입력했습니다.');
   return true;
 }
@@ -217,15 +218,48 @@ async function waitLoggedIn(page, successIndicator, timeoutMs = 15000) {
   return { ok: false, message: lastMessage };
 }
 
-/** 로그인 제출 — 버튼을 찾지 못하면 비밀번호 칸에서 Enter 로 시도한다 */
-async function submitLogin(page, submitSelector, fallbackField) {
+/**
+ * 로그인 제출.
+ *
+ * 아이디·비밀번호·OTP 를 다 채워야 로그인 버튼이 풀리는 화면이 많다. 화면이 입력을
+ * 반영해 버튼을 활성화하기까지는 잠깐 걸리므로, 채우자마자 누르면 비활성 버튼을 누르게 된다.
+ * 버튼이 풀릴 때까지 기다렸다가 누르고, 그래도 못 누르면 조용히 넘기지 않고 알린다.
+ */
+async function submitLogin(page, submitSelector, fallbackField, { required = true } = {}) {
   const submit = await firstVisible(page, [
     submitSelector,
     "button[type='submit']", "input[type='submit']",
     "button.loginBtn", "[class*='login' i][type='button']",
   ]);
-  if (submit) await submit.click().catch(() => {});
-  else await fallbackField?.press('Enter').catch(() => {});
+
+  if (!submit) {
+    if (fallbackField) await fallbackField.press('Enter').catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
+    return;
+  }
+
+  // 버튼이 풀릴 때까지 기다린다
+  const enabled = await submit.isEnabled().catch(() => true);
+  if (!enabled) {
+    await page.waitForFunction(() => {
+      const b = [...document.querySelectorAll("button, input[type='submit']")]
+        .find(x => (x.offsetWidth || x.offsetHeight) &&
+          /login|로그인|확인|submit/i.test((x.className || '') + (x.innerText || '') + (x.value || '')));
+      return b && !b.disabled && b.getAttribute('aria-disabled') !== 'true';
+    }, null, { timeout: 6000 }).catch(() => {});
+  }
+
+  const still = await submit.isDisabled().catch(() => false);
+  if (still && required) {
+    throw new Error(
+      '로그인 버튼이 눌리지 않는 상태입니다. 아이디·비밀번호·OTP 가 모두 채워져야 ' +
+      '버튼이 풀리는 화면일 수 있습니다. OTP 칸에 넣을 값을 지정했는지 확인하세요.');
+  }
+
+  await submit.click({ timeout: 8000 }).catch(async () => {
+    // 버튼을 눌렀는데도 반응이 없으면 Enter 로 한 번 더 시도한다
+    await fallbackField?.press('Enter').catch(() => {});
+  });
   await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
 }
 
@@ -271,6 +305,7 @@ async function doLogin(page, cfg) {
 
   await page.fill(userSel, username);
   await pw.fill(password);
+  await page.waitForTimeout(150);   // 화면이 입력을 반영할 틈
 
   // 같은 화면에 OTP 칸이 함께 있는 경우 (아이디·비밀번호·OTP 한 번에 입력하는 방식)
   try {
@@ -286,7 +321,7 @@ async function doLogin(page, cfg) {
   // 제출 후 OTP 칸이 나타나는 경우 (2단계로 나뉜 방식)
   try {
     if (await fillOtp(page, otpValue, log)) {
-      await submitLogin(page, submitSelector, null);
+      await submitLogin(page, submitSelector, null, { required: false });
     }
   } catch (e) {
     if (e.message === 'OTP_REQUIRED') throw new Error(otpGuide());
