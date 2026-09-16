@@ -44,6 +44,39 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/reports', express.static(path.join(__dirname, 'reports')));
 
+/**
+ * 리포트 파일이 없을 때 안내한다.
+ * 서버를 다시 시작했거나 오래된 기록이 정리되면 화면에는 링크가 남아 있어도 파일은 없다.
+ * 기본 404 는 "Cannot GET ..." 만 보여줘 무슨 상황인지 알 수 없다.
+ */
+app.get('/reports/*', (req, res) => {
+  const wantsFile = /\.(html|xlsx|md|png)$/i.test(req.path);
+  if (!wantsFile) return res.status(404).json({ error: '없는 경로입니다.' });
+
+  res.status(404).type('html').send(`<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>리포트를 찾을 수 없습니다</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    max-width:520px;margin:90px auto;padding:0 24px;color:#1f1f28;line-height:1.7}
+  h1{font-size:20px;margin-bottom:10px}
+  p{color:#5f5f6d;font-size:14.5px}
+  ul{color:#5f5f6d;font-size:14px;margin:14px 0 0 18px}
+  a{display:inline-block;margin-top:24px;background:#7c5cff;color:#fff;text-decoration:none;
+    padding:11px 20px;border-radius:9px;font-size:14px;font-weight:600}
+</style></head>
+<body>
+  <h1>리포트 파일이 없습니다</h1>
+  <p>검사 결과 화면에는 링크가 남아 있지만, 서버에 파일이 없습니다. 보통 이런 경우입니다.</p>
+  <ul>
+    <li>서버를 다시 시작한 뒤라 이전 검사의 파일이 정리됐다</li>
+    <li>1년이 지나 오래된 기록과 함께 지워졌다</li>
+    <li>리포트 폴더를 직접 비웠다</li>
+  </ul>
+  <p style="margin-top:16px">같은 주소를 <b>다시 검사</b>하면 리포트가 새로 만들어집니다.</p>
+  <a href="/">검사 화면으로</a>
+</body></html>`);
+});
+
 /** scanId → { status, events[], results, meta, stop } */
 const scans = new Map();
 const MAX_SCANS = 20;

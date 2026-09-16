@@ -14,6 +14,7 @@
  */
 const defaultCfg = require('../config.json');
 const path = require('path');
+const { explainClick, explainRequestFailure } = require('./explain');
 
 const CLICKABLE = 'button, a, [role=button], [onclick], input[type=button], input[type=submit], input[type=reset]';
 
@@ -315,7 +316,7 @@ async function scanPage(page, pageUrl, opts = {}) {
 
         // 대상 사이트 자신에 대한 요청 실패만 결함 후보로 본다
         const h = (() => { try { return new URL(req.url()).hostname; } catch { return ''; } })();
-        if (h && startSite && siteOf(h) === startSite) failedOwn = { url: req.url(), why };
+        if (h && startSite && siteOf(h) === startSite) failedOwn = { url: req.url(), why: explainRequestFailure(why) };
       };
       const onConsole = msg => {
         if (!clickedAt || jsError || msg.type() !== 'error') return;
@@ -341,7 +342,7 @@ async function scanPage(page, pageUrl, opts = {}) {
       try {
         await locator.click({ timeout: 2500, noWaitAfter: true });
       } catch (e) {
-        clickFail = String(e?.message || e).split('\n')[0].slice(0, 120);
+        clickFail = explainClick(e?.message || e, 2500);
       }
 
       // ── 적응형 관찰: 신호가 잡히면 기다리지 않고 끝낸다 ──
@@ -397,7 +398,7 @@ async function scanPage(page, pageUrl, opts = {}) {
         status = 'ERROR'; reason = `HTTP ${badStatus.status} — ${shortUrl(badStatus.url)}`;
       } else if (failedOwn) {
         status = 'ERROR';
-        reason = `요청 실패 — ${shortUrl(failedOwn.url)}${failedOwn.why ? ` (${failedOwn.why.replace(/^net::/, '')})` : ''}`;
+        reason = `${failedOwn.why} — ${shortUrl(failedOwn.url)}`;
       } else if (!signals.dom && !signals.net && !signals.url && !signals.vis && !signals.scroll && !signals.popup) {
         status = 'NO-RESPONSE'; reason = `클릭 후 ${(observedMs / 1000).toFixed(1)}초 동안 무변화`;
       } else {

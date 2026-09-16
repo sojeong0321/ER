@@ -646,6 +646,7 @@
                 <button class="btn" type="button" id="printBtn">인쇄</button>
                 <a class="btn" id="openReport" target="_blank" rel="noopener">리포트 열기</a>
                 <button class="btn primary" type="button" id="rescanBtn">다시 검사</button>
+                <button class="btn" type="button" id="newScanBtn">처음 화면</button>
               </div>
             </div>
 
@@ -1269,6 +1270,15 @@ function renderExports() {
 }
 
 $('rescanBtn').addEventListener('click', () => rescan());
+
+$('newScanBtn').addEventListener('click', () => {
+  if (!confirm('지금 결과를 닫고 처음 화면으로 돌아갈까요?\n\n리포트는 검사 이력에 남아 있어 언제든 다시 열 수 있습니다.')) return;
+  hasResult = false;
+  $('errNote').classList.remove('on');
+  closeSide();
+  navigate('dash');
+  loadHistory();
+});
 $('printBtn').addEventListener('click', () => window.print());
 
 /** 같은 주소·같은 설정으로 다시 검사한다 */

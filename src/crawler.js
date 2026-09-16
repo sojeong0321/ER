@@ -4,6 +4,7 @@
  */
 const { scanPage } = require('./engine');
 const cfg = require('../config.json');
+const { explainNavigation } = require('./explain');
 
 /** 검사 의미가 없는 링크 — 파일 다운로드·프로토콜 링크 */
 const SKIP_LINK = /\.(pdf|zip|docx?|xlsx?|pptx?|hwp|csv|png|jpe?g|gif|svg|mp4|mp3|dmg|exe)(\?|$)/i;
@@ -89,11 +90,12 @@ async function crawl(browser, startUrl, scope, onProgress, opts = {}) {
         continue;
       }
     } catch (e) {
-      const msg = String(e?.message || e).split('\n')[0].slice(0, 160);
+      const raw = String(e?.message || e);
+      const msg = explainNavigation(raw);
 
       // 다른 이동이 끼어들어 중단된 진입은 검사 방식이 만든 것이지 사이트의 결함이 아니다.
       // 해당 주소는 다음 차례에 다시 시도된다.
-      if (/interrupted by another navigation|ERR_ABORTED/i.test(msg)) {
+      if (/interrupted by another navigation|ERR_ABORTED/i.test(raw)) {
         report('pageError', { url, msg: '다른 이동이 끼어들어 건너뜀' });
         continue;
       }
@@ -101,7 +103,7 @@ async function crawl(browser, startUrl, scope, onProgress, opts = {}) {
       report('pageError', { url, msg });
       allResults.push({
         page: url, label: '(페이지 진입)', sel: url, status: 'ERROR',
-        reason: `접근 실패: ${msg}`, signals: {},
+        reason: `페이지를 열지 못했습니다 — ${msg}`, signals: {},
       });
       continue;
     }
