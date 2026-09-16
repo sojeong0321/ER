@@ -103,8 +103,8 @@
   .pulse{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1.4s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
   @media (prefers-reduced-motion:reduce){.pulse{animation:none}}
-  .logbox{margin-top:14px;background:var(--surface);border-radius:var(--r);padding:12px 14px;max-height:132px;overflow-y:auto}
-  .logbox p{font-size:13px;color:var(--ink2);padding:1px 0;font-family:var(--code)}
+  .logbox{margin-top:14px;background:var(--surface);border-radius:var(--r);padding:14px 16px;height:min(46vh,420px);overflow-y:auto}
+  .logbox p{font-size:13px;color:var(--ink2);padding:2px 0;font-family:var(--code);line-height:1.7;word-break:break-all}
   .logbox p:last-child{color:var(--ink)}
 
   /* ── 결과 ── */
@@ -213,6 +213,39 @@
   .share .addr button:hover{border-color:var(--ink)}
   main{min-height:calc(100vh - 62px)}
 
+  /* 최근 검사 이력 */
+  .hist{margin-top:28px}
+  .hist h3{font-size:14px;font-weight:650;margin-bottom:4px}
+  .hist .sub{font-size:13px;color:var(--ink2);margin-bottom:12px}
+  .hrow{display:flex;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line2);font-size:13.5px;flex-wrap:wrap}
+  .hrow .u{font-family:var(--code);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:180px}
+  .hrow .when{color:var(--ink3);font-size:12.5px;white-space:nowrap}
+  .hrow .res{white-space:nowrap;font-weight:600}
+  .hrow .res.bad{color:var(--er)}
+  .hrow .res.ok{color:var(--ok)}
+  .hrow .acts{display:flex;gap:8px}
+
+  /* 내보내기 */
+  .exports{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+  .exports .scope{font-size:12.5px;color:var(--ink3);white-space:nowrap}
+
+  /* 스크린샷 확대 */
+  .shotwrap{position:relative}
+  .shotwrap .tools{position:absolute;top:8px;right:8px;display:flex;gap:6px}
+  .shotwrap .tools button{background:rgba(22,24,29,.78);color:#fff;border-radius:7px;padding:6px 10px;font-size:12px;font-weight:600;backdrop-filter:blur(4px)}
+  .shotwrap .tools button:hover{background:rgba(22,24,29,.92)}
+  .shot{width:100%;border:1px solid var(--line);border-radius:8px;display:block;cursor:zoom-in}
+  .lightbox{position:fixed;inset:0;background:rgba(12,14,18,.9);z-index:70;display:none;flex-direction:column}
+  .lightbox.on{display:flex}
+  .lightbox .bar{display:flex;gap:10px;align-items:center;padding:14px 18px;color:#fff;font-size:13.5px}
+  .lightbox .bar .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lightbox .bar button{color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:7px;padding:7px 13px;font-size:13px;font-weight:600}
+  .lightbox .bar button:hover{background:rgba(255,255,255,.14)}
+  .lightbox .canvas{flex:1;overflow:auto;padding:0 18px 18px;text-align:center}
+  .lightbox img{max-width:100%;border-radius:8px;background:#fff}
+
+  mark{background:#ffe9a8;color:inherit;border-radius:3px;padding:0 1px}
+
   .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);background:var(--ink);color:#fff;padding:12px 20px;border-radius:9px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:60}
   .toast.on{opacity:1;transform:translate(-50%,0)}
   footer{padding:36px 0;color:var(--ink3);font-size:13px;border-top:1px solid var(--line);margin-top:40px}
@@ -224,8 +257,23 @@
     .wrap{padding:0 16px}
   }
   @media print{
-    header,.setup,.run,.tabs,.listtools,.side,.veil,.vside,footer{display:none!important}
-    .item{break-inside:avoid}
+    @page{margin:12mm 10mm}
+    header,.setup,.run,.tabs,.listtools,.side,.veil,.vside,.intro,#toast{display:none!important}
+    /* 화면용 최소 높이가 인쇄에도 적용되면 첫 장에 빈 공간이 크게 남는다 */
+    main{min-height:0!important}
+    body{font-size:11px;line-height:1.45}
+    .wrap{padding:0;max-width:none}
+    .verdict{padding:0 0 10px}
+    .vmain h1{font-size:20px}
+    .strip{margin:10px 0 6px}
+    .cell{height:14px}
+    .striplegend{margin-top:6px;font-size:10px}
+    .pgroup{margin-bottom:12px}
+    .item{break-inside:avoid;padding:6px 8px 6px 0;grid-template-columns:3px 78px 1fr 190px}
+    .lbl{font-size:12px}
+    .sel,.why{font-size:10.5px}
+    .tag{font-size:10px;padding:2px 6px}
+    footer{padding:10px 0;font-size:10px;border-top:1px solid var(--line)}
   }
 </style>
 </head>
@@ -263,7 +311,7 @@
     <div class="adv" id="adv">
       <label class="fld"><span>요소당 관찰 시간</span><input id="observeMs" type="number" value="2000" min="300" step="100" style="width:110px"></label>
       <label class="fld"><span>최대 페이지 수</span><input id="maxPages" type="number" value="50" min="1" style="width:100px"></label>
-      <label class="fld wide"><span>클릭하지 않을 단어</span><input id="excl" value="삭제, 탈퇴, 결제, 로그아웃, 구매, 주문" spellcheck="false"></label>
+      <label class="fld wide"><span>클릭하지 않을 단어 <span class="opt">(쉼표로 구분)</span></span><input id="excl" value="삭제, 탈퇴, 결제, 로그아웃, 구매, 주문" placeholder="삭제, 발송, 승인" spellcheck="false"></label>
       <label class="chk"><input type="checkbox" id="loginOn"> 로그인이 필요한 화면</label>
       <div class="loginrow" id="loginRow">
         <div class="seg" id="authSeg" role="group" aria-label="로그인 방식">
@@ -281,7 +329,7 @@
           </div>
           <div class="credrow">
             <button type="button" class="openbtn sm" id="saveCredBtn">이 PC에 저장</button>
-            <button type="button" class="linkbtn" id="checkOtpBtn">OTP 값 확인</button>
+            <button type="button" class="linkbtn" id="checkOtpBtn" title="OTP 칸에 실제로 어떤 값이 입력될지 미리 보여줍니다. 인증 앱 비밀키를 넣었다면 지금 코드가 나오니 앱 화면과 대조해 보세요.">입력될 값 미리보기</button>
             <button type="button" class="linkbtn" id="forgetCredBtn" hidden>저장된 계정 지우기</button>
             <span class="hint" id="credState"></span>
           </div>
@@ -340,6 +388,12 @@
       </div>
     </div>
 
+    <div class="hist" id="histBox" hidden>
+      <h3>최근 검사</h3>
+      <p class="sub">같은 주소를 다시 검사하거나, 저장된 리포트를 열 수 있습니다.</p>
+      <div id="histList"></div>
+    </div>
+
     <div class="share" id="share" hidden>
       <h3>같은 사내망 동료도 쓸 수 있습니다</h3>
       <p>검사는 이 PC에서 실행되므로, 이 PC가 열 수 있는 주소는 모두 검사할 수 있습니다. 개발 서버나 사내 주소도 됩니다.<br>동료에게는 아래 주소를 알려주세요. 주소를 누르면 복사됩니다.</p>
@@ -366,7 +420,9 @@
           <h1 id="headline">—</h1>
           <p id="subline"></p>
         </div>
-        <div class="vside" id="dlBox"></div>
+        <div class="vside">
+          <div class="exports" id="dlBox"></div>
+        </div>
       </div>
 
       <div class="strip">
@@ -413,6 +469,15 @@
   </div>
 </aside>
 
+<div class="lightbox" id="lightbox" role="dialog" aria-label="결함 발생 화면">
+  <div class="bar">
+    <span class="t" id="lbTitle"></span>
+    <button type="button" id="lbSave">이미지 저장</button>
+    <button type="button" id="lbClose">닫기</button>
+  </div>
+  <div class="canvas"><img id="lbImg" alt="결함 발생 시점 화면"></div>
+</div>
+
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -449,6 +514,16 @@ function toast(m) {
   clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 2200);
 }
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/** 검색어와 겹치는 부분을 표시한다 */
+function hi(text) {
+  const safe = esc(text);
+  const q = esc($('q').value.trim());
+  if (!q) return safe;
+  const pattern = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  try { return safe.replace(new RegExp(pattern, 'gi'), m => `<mark>${m}</mark>`); }
+  catch { return safe; }
+}
 function log(msg) {
   const p = document.createElement('p');
   p.textContent = msg;
@@ -707,8 +782,9 @@ socket.on('done', ({ results, meta }) => {
   $('goBtn').disabled = false;
   $('stopBtn').style.display = 'none';
   $('stopBtn').disabled = false;
-  $('hstat').textContent = `${meta.scannedAt} 검사`;
+  $('hstat').textContent = `검사 일시: ${meta.scannedAt}`;
   render();
+  loadHistory();
   $('out').classList.add('on');
   $('out').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
@@ -740,11 +816,7 @@ function render() {
     (META.stopped ? ' · 중단됨' : '') +
     (tested ? ` · 정상 비율 ${Math.round(c.PASS / tested * 100)}%` : '');
 
-  // 리포트 파일 — 서버가 저장해 둔 것을 그대로 받는다
-  $('dlBox').innerHTML = META.scanId ? `
-    <a class="dl" href="/reports/${META.scanId}/smoke-report.xlsx" download>엑셀 받기</a>
-    <a class="dl" href="/reports/${META.scanId}/smoke-report.html" target="_blank" rel="noopener">리포트 열기</a>
-    <button class="dl" onclick="window.print()">인쇄</button>` : '';
+  renderExports();
 
   // 검사 스트립
   $('strip').innerHTML = DATA.map((d, i) =>
@@ -765,11 +837,79 @@ function render() {
     const t = e.target.closest('.tab'); if (!t) return;
     filter = t.dataset.f;
     [...$('tabs').children].forEach(x => x.setAttribute('aria-selected', String(x.dataset.f === filter)));
+    renderExports();
     renderList();
   };
 
   renderList();
 }
+
+/** 내보내기 버튼 — 지금 보고 있는 탭만 담아 내려받는다 */
+function renderExports() {
+  if (!META.scanId) { $('dlBox').innerHTML = ''; return; }
+  const label = { ALL:'전체', ERROR:'에러', 'NO-RESPONSE':'무감', PASS:'정상', EXCLUDED:'검사 제외' }[filter] || '전체';
+  const q = f => `/api/report/${META.scanId}/export?format=${f}&filter=${encodeURIComponent(filter)}`;
+  $('dlBox').innerHTML = `
+    <span class="scope">${esc(label)} 기준</span>
+    <a class="dl" href="${q('xlsx')}">엑셀</a>
+    <a class="dl" href="${q('md')}">Markdown</a>
+    <a class="dl" href="${q('html')}" target="_blank" rel="noopener">리포트 열기</a>
+    <button class="dl" type="button" id="printBtn">인쇄</button>
+    <button class="dl" type="button" id="rescanBtn">다시 검사</button>`;
+  $('printBtn').onclick = () => window.print();
+  $('rescanBtn').onclick = () => rescan();
+}
+
+/** 같은 주소·같은 설정으로 다시 검사한다 */
+function rescan(entry) {
+  const target = entry?.url || META.url;
+  if (!target) return;
+  $('url').value = target;
+  const st = entry?.settings;
+  if (st) {
+    if (st.scope) {
+      scope = st.scope;
+      [...$('scopeSeg').children].forEach(x => x.setAttribute('aria-pressed', String(x.dataset.s === scope)));
+    }
+    if (st.observeMs) $('observeMs').value = st.observeMs;
+    if (st.maxPages) $('maxPages').value = st.maxPages;
+    if (Array.isArray(st.excludeRules)) $('excl').value = st.excludeRules.join(', ');
+    if (st.authMode && st.authMode !== 'none') {
+      $('loginOn').checked = true;
+      $('loginRow').classList.add('open');
+      authMode = st.authMode;
+      [...$('authSeg').children].forEach(x => x.setAttribute('aria-pressed', String(x.dataset.m === authMode)));
+      $('paneCred').hidden = authMode !== 'credentials';
+      $('paneSession').hidden = authMode !== 'session';
+    }
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  startScan();
+}
+
+/* ── 최근 검사 이력 ── */
+function loadHistory() {
+  return fetch('/api/history').then(r => r.json()).then(list => {
+    if (!Array.isArray(list) || !list.length) { $('histBox').hidden = true; return; }
+    $('histBox').hidden = false;
+    $('histList').innerHTML = list.slice(0, 8).map((h, i) => `
+      <div class="hrow">
+        <span class="u" title="${esc(h.url)}">${esc(h.url)}</span>
+        <span class="when">${esc(h.scannedAt)}</span>
+        <span class="res ${h.defects ? 'bad' : 'ok'}">${h.defects ? `결함 ${h.defects}건` : '결함 없음'}</span>
+        <span class="when">요소 ${h.total}개</span>
+        <span class="acts">
+          <a class="dl" href="/reports/${esc(h.scanId)}/smoke-report.html" target="_blank" rel="noopener">리포트</a>
+          <button class="dl" type="button" data-i="${i}">다시 검사</button>
+        </span>
+      </div>`).join('');
+    $('histList').onclick = e => {
+      const b = e.target.closest('button[data-i]'); if (!b) return;
+      rescan(list[Number(b.dataset.i)]);
+    };
+  }).catch(() => {});
+}
+loadHistory();
 
 function visible() {
   const q = $('q').value.trim().toLowerCase();
@@ -797,7 +937,7 @@ function renderList() {
     const c = tally(items);
     const bad = c.ERROR + c['NO-RESPONSE'];
     return `<div class="pgroup">
-      <div class="pgtitle"><span class="u">${esc(page)}</span>
+      <div class="pgtitle"><span class="u">${hi(page)}</span>
         <span class="n">${bad ? `<span style="color:var(--er);font-weight:600">결함 ${bad}건</span> · ` : ''}요소 ${items.length}개</span>
       </div>
       ${items.map(d => `
@@ -805,8 +945,8 @@ function renderList() {
           <span class="bar"></span>
           <span><span class="tag ${d.status}">${LABEL[d.status] || d.status}</span></span>
           <span style="min-width:0">
-            <span class="lbl">${esc(d.label)}</span>
-            <span class="sel">${esc(d.sel)}</span>
+            <span class="lbl">${hi(d.label)}</span>
+            <span class="sel">${hi(d.sel)}</span>
           </span>
           <span class="why">${esc(d.reason || '')}</span>
         </button>`).join('')}
@@ -834,8 +974,17 @@ function openSide(i) {
           return `<span class="sig ${bad ? 'bad' : on ? 'on' : ''}">${name} ${on ? '있음' : '없음'}</span>`;
         }).join('')}</div></div>` : '';
 
-  const shot = d.screenshot && META.scanId
-    ? `<div class="block"><h3>결함 발생 화면</h3><img class="shot" alt="결함 발생 시점 화면" src="/reports/${META.scanId}/shots/${encodeURIComponent(d.screenshot)}"></div>` : '';
+  const shotUrl = d.screenshot && META.scanId
+    ? `/reports/${META.scanId}/shots/${encodeURIComponent(d.screenshot)}` : null;
+  const shot = shotUrl
+    ? `<div class="block"><h3>결함 발생 화면</h3>
+        <div class="shotwrap">
+          <img class="shot" alt="결함 발생 시점 화면" src="${shotUrl}" data-full="${shotUrl}" data-name="${esc(d.label)}">
+          <div class="tools">
+            <button type="button" class="zoomBtn">확대</button>
+            <button type="button" class="saveBtn">저장</button>
+          </div>
+        </div></div>` : '';
 
   $('sBody').innerHTML = `
     <div class="block">
@@ -855,17 +1004,48 @@ function openSide(i) {
       핸들러가 연결되지 않았거나, 조건 분기에 걸려 아무 동작도 하지 않았을 수 있습니다.
       의도적으로 반응이 없는 버튼이라면 <code>disabled</code> 처리를 권합니다.</p></div>` : ''}
   `;
+  const img = $('sBody').querySelector('.shot');
+  if (img) {
+    const open = () => openShot(img.dataset.full, img.dataset.name);
+    img.onclick = open;
+    $('sBody').querySelector('.zoomBtn').onclick = open;
+    $('sBody').querySelector('.saveBtn').onclick = () => saveShot(img.dataset.full, img.dataset.name);
+  }
+
   $('side').classList.add('on'); $('side').setAttribute('aria-hidden', 'false');
   $('veil').classList.add('on');
   $('sClose').focus();
 }
+/* ── 결함 화면 확대 ── */
+function openShot(url, name) {
+  $('lbImg').src = url;
+  $('lbTitle').textContent = name || '결함 발생 화면';
+  $('lightbox').classList.add('on');
+  $('lbClose').focus();
+}
+function closeShot() { $('lightbox').classList.remove('on'); $('lbImg').src = ''; }
+function saveShot(url, name) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${String(name || 'screenshot').replace(/[\\/:*?"<>|]/g, '_').slice(0, 40)}.png`;
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('이미지를 저장했습니다');
+}
+$('lbClose').addEventListener('click', closeShot);
+$('lbSave').addEventListener('click', () => saveShot($('lbImg').src, $('lbTitle').textContent));
+$('lightbox').addEventListener('click', e => { if (e.target === $('lightbox')) closeShot(); });
+
 function closeSide() {
   $('side').classList.remove('on'); $('side').setAttribute('aria-hidden', 'true');
   $('veil').classList.remove('on');
 }
 $('sClose').addEventListener('click', closeSide);
 $('veil').addEventListener('click', closeSide);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSide(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if ($('lightbox').classList.contains('on')) closeShot();
+  else closeSide();
+});
 
 $('copySel').addEventListener('click', () => {
   if (!picked) return;

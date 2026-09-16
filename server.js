@@ -7,6 +7,7 @@
 const express = require('express');
 const http = require('http');
 const os = require('os');
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { Server } = require('socket.io');
@@ -15,7 +16,7 @@ const login_ = require('./src/login');
 const { doLogin, readSession, saveSession, clearSession } = login_;
 const totp = require('./src/totp');
 const { crawl } = require('./src/crawler');
-const { saveHtml, saveExcel } = require('./src/reporter');
+const { saveHtml, saveExcel, saveMarkdown, buildHtml, buildMarkdown } = require('./src/reporter');
 const cfg = require('./config.json');
 
 const app = express();
@@ -225,6 +226,103 @@ app.get('/test-target.html', (req, res) => res.sendFile(path.join(__dirname, 'te
 app.get('/api/_test/500', (req, res) => res.status(500).json({ error: 'intentional test error' }));
 app.get('/api/_test/ok', (req, res) => res.json({ ok: true }));
 
+/* ── 검사 이력 ── */
+
+const HISTORY_FILE = path.join(__dirname, 'reports', 'history.json');
+
+function readHistory() {
+  try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); } catch { return []; }
+}
+
+/** 같은 주소를 다시 검사할 수 있도록 설정까지 함께 남긴다 */
+function recordHistory(scanId, meta, results, options) {
+  const c = { ERROR: 0, 'NO-RESPONSE': 0, PASS: 0, EXCLUDED: 0, UNCLICKABLE: 0 };
+  results.forEach(r => { c[r.status] = (c[r.status] || 0) + 1; });
+
+  const entry = {
+    scanId,
+    url: meta.url,
+    scope: meta.scope,
+    scannedAt: meta.scannedAt,
+    at: Date.now(),
+    elapsed: meta.elapsed,
+    stopped: !!meta.stopped,
+    total: results.length,
+    defects: c.ERROR + c['NO-RESPONSE'],
+    counts: c,
+    // 재검사용 설정
+    settings: {
+      scope: options.scope,
+      observeMs: options.observeMs,
+      maxPages: options.maxPages,
+      excludeRules: options.excludeRules,
+      authMode: options.authMode,
+    },
+  };
+
+  const list = readHistory();
+  list.unshift(entry);
+  fs.mkdirSync(path.dirname(HISTORY_FILE), { recursive: true });
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(list.slice(0, 100), null, 2), 'utf8');
+}
+
+app.get('/api/history', (req, res) => {
+  const url = req.query.url;
+  const list = readHistory();
+  res.json(url ? list.filter(h => h.url === url) : list);
+});
+
+app.delete('/api/history', (req, res) => {
+  try { fs.unlinkSync(HISTORY_FILE); } catch {}
+  res.json({ ok: true });
+});
+
+/* ── 내보내기 ── */
+
+const FILTER_LABEL = {
+  ALL: '전체', ERROR: '에러만', 'NO-RESPONSE': '무감만',
+  DEFECT: '결함만(에러·무감)', PASS: '정상만', EXCLUDED: '검사 제외만',
+};
+
+function applyFilter(results, filter) {
+  if (!filter || filter === 'ALL') return results;
+  if (filter === 'DEFECT') return results.filter(r => r.status === 'ERROR' || r.status === 'NO-RESPONSE');
+  if (filter === 'EXCLUDED') return results.filter(r => r.status === 'EXCLUDED' || r.status === 'UNCLICKABLE');
+  return results.filter(r => r.status === filter);
+}
+
+/**
+ * 현재 보고 있는 탭만 골라 내보낸다.
+ * 예를 들어 무감 탭에서 내보내면 무감 항목만 담긴 파일이 나온다.
+ */
+app.get('/api/report/:scanId/export', (req, res) => {
+  const scan = scans.get(req.params.scanId);
+  if (!scan || scan.status !== 'done') return res.status(404).json({ error: '검사 결과가 없습니다.' });
+
+  const format = String(req.query.format || 'md').toLowerCase();
+  const filter = String(req.query.filter || 'ALL').toUpperCase();
+  const picked = applyFilter(scan.results, filter);
+  const meta = { ...scan.meta, filterLabel: FILTER_LABEL[filter] || '전체' };
+  const suffix = filter === 'ALL' ? '' : `-${filter.toLowerCase().replace(/[^a-z]/g, '')}`;
+  const base = `smoke-report${suffix}`;
+
+  const send = (body, type, ext) => {
+    res.setHeader('Content-Type', type);
+    res.setHeader('Content-Disposition',
+      `attachment; filename="${base}.${ext}"; filename*=UTF-8''${encodeURIComponent(base + '.' + ext)}`);
+    res.send(body);
+  };
+
+  if (format === 'md') return send(buildMarkdown(picked, meta), 'text/markdown; charset=utf-8', 'md');
+  if (format === 'html') return send(buildHtml(picked, meta), 'text/html; charset=utf-8', 'html');
+  if (format === 'xlsx') {
+    const dir = path.join(__dirname, 'reports', req.params.scanId, 'export');
+    const file = saveExcel(picked, meta, dir);
+    return res.download(file, `${base}.xlsx`);
+  }
+  res.status(400).json({ error: '지원하지 않는 형식입니다.' });
+});
+
 async function runScan(scanId, options) {
   const scan = scans.get(scanId);
   const emit = emitter(scanId);
@@ -308,6 +406,8 @@ async function runScan(scanId, options) {
     const outputDir = path.join(__dirname, 'reports', scanId);
     saveHtml(results, meta, outputDir);
     saveExcel(results, meta, outputDir);
+    saveMarkdown(results, meta, outputDir);
+    recordHistory(scanId, meta, results, options);
 
     Object.assign(scan, { status: 'done', results, meta });
     emit('done', { results, meta, scanId });
@@ -335,7 +435,7 @@ function browserHint(e) {
 }
 
 function ensureDir(p) {
-  require('fs').mkdirSync(p, { recursive: true });
+  fs.mkdirSync(p, { recursive: true });
   return p;
 }
 

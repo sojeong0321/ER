@@ -139,6 +139,66 @@ function buildHtml(results, meta) {
 </body></html>`;
 }
 
+/**
+ * Markdown 리포트 — 이슈 티켓·위키·메신저에 그대로 붙여넣기 위한 형식
+ */
+function buildMarkdown(results, meta) {
+  const c = counts(results);
+  const defects = c.ERROR + c['NO-RESPONSE'];
+  const tested = c.PASS + c.ERROR + c['NO-RESPONSE'];
+  const rate = tested ? Math.round(c.PASS / tested * 100) : 0;
+  const pages = [...new Set(results.map(r => r.page))];
+  const esc = t => String(t ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+
+  const out = [];
+  out.push(`# 자동 스모크 테스트 결과`);
+  out.push('');
+  out.push(defects ? `**결함 ${defects}건**` : (tested ? '**결함 없음**' : '**검사한 요소 없음**'));
+  out.push('');
+  out.push('| 항목 | 값 |');
+  out.push('|---|---|');
+  out.push(`| 검사 대상 | ${esc(meta.url)} |`);
+  out.push(`| 검사 일시 | ${esc(meta.scannedAt)} |`);
+  out.push(`| 검사 범위 | ${esc(meta.scope)} |`);
+  out.push(`| 검사 페이지 | ${pages.length}개 |`);
+  out.push(`| 검사 요소 | ${results.length}개 |`);
+  out.push(`| 에러 / 무감 / 정상 / 제외 | ${c.ERROR} / ${c['NO-RESPONSE']} / ${c.PASS} / ${c.EXCLUDED + c.UNCLICKABLE} |`);
+  out.push(`| 정상 비율 | ${rate}% |`);
+  out.push(`| 소요 시간 | ${esc(meta.elapsed)}초 |`);
+  if (meta.filterLabel) out.push(`| 내보낸 범위 | ${esc(meta.filterLabel)} |`);
+  out.push('');
+
+  for (const page of pages) {
+    const items = results.filter(r => r.page === page)
+      .sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9));
+    const gc = counts(items);
+    const bad = gc.ERROR + gc['NO-RESPONSE'];
+    out.push(`## ${esc(page)}`);
+    out.push('');
+    out.push(bad ? `결함 ${bad}건 · 요소 ${items.length}개` : `요소 ${items.length}개`);
+    out.push('');
+    out.push('| 판정 | 요소 | 선택자 | 판정 근거 |');
+    out.push('|---|---|---|---|');
+    for (const r of items) {
+      out.push(`| ${NAME[r.status] || r.status} | ${esc(r.label)} | \`${esc(r.sel)}\` | ${esc(r.reason || '')} |`);
+    }
+    out.push('');
+  }
+
+  out.push('---');
+  out.push('');
+  out.push('반응이 있는지만 판정합니다. 그 반응이 기획과 맞는지는 사람이 확인해야 합니다.');
+  out.push('');
+  return out.join('\n');
+}
+
+function saveMarkdown(results, meta, outputDir) {
+  fs.mkdirSync(outputDir, { recursive: true });
+  const filePath = path.join(outputDir, 'smoke-report.md');
+  fs.writeFileSync(filePath, buildMarkdown(results, meta), 'utf8');
+  return filePath;
+}
+
 function saveHtml(results, meta, outputDir) {
   fs.mkdirSync(outputDir, { recursive: true });
   const filePath = path.join(outputDir, 'smoke-report.html');
@@ -199,4 +259,4 @@ function saveExcel(results, meta, outputDir) {
   return filePath;
 }
 
-module.exports = { saveHtml, saveExcel };
+module.exports = { saveHtml, saveExcel, saveMarkdown, buildHtml, buildMarkdown };
