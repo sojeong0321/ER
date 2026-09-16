@@ -46,7 +46,7 @@ function emitter(scanId) {
 }
 
 app.post('/api/scan', (req, res) => {
-  const { url, scope, login, excludeRules, observeMs, maxPages, authMode } = req.body || {};
+  const { url, scope, login, excludeRules, observeMs, maxPages, authMode, clickNewTab, clickExternal } = req.body || {};
   if (!url || !/^https?:\/\//i.test(String(url))) {
     return res.status(400).json({ error: 'http:// 또는 https:// 로 시작하는 URL을 입력하세요.' });
   }
@@ -66,6 +66,8 @@ app.post('/api/scan', (req, res) => {
     excludeRules,
     observeMs: Number(observeMs) || cfg.observeMs || 2000,
     maxPages: Number(maxPages) || cfg.maxPages || 50,
+    clickNewTab: !!clickNewTab,
+    clickExternal: !!clickExternal,
   });
 });
 
@@ -257,6 +259,8 @@ function recordHistory(scanId, meta, results, options) {
       maxPages: options.maxPages,
       excludeRules: options.excludeRules,
       authMode: options.authMode,
+      clickNewTab: options.clickNewTab,
+      clickExternal: options.clickExternal,
     },
   };
 
@@ -326,7 +330,7 @@ app.get('/api/report/:scanId/export', (req, res) => {
 async function runScan(scanId, options) {
   const scan = scans.get(scanId);
   const emit = emitter(scanId);
-  const { url, scope, login, authMode, excludeRules, observeMs, maxPages } = options;
+  const { url, scope, login, authMode, excludeRules, observeMs, maxPages, clickNewTab, clickExternal } = options;
   let browser = null;
 
   try {
@@ -388,6 +392,8 @@ async function runScan(scanId, options) {
       observeMs,
       excludeRules,
       maxPages,
+      clickNewTab,
+      clickExternal,
       screenshotDir: ensureDir(path.join(__dirname, 'reports', scanId, 'shots')),
       shouldStop: () => scan.stop,
     });

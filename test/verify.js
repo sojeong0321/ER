@@ -30,6 +30,7 @@ const EXPECT = {
   'lnk-js-live': 'PASS',          // javascript: 링크에 동작이 연결된 경우
   'lnk-js-dead': 'NO-RESPONSE',   // javascript: 링크인데 아무 동작도 없는 경우
   'btn-modal': 'PASS',            // 모달 표시 — 화면 변화
+  'btn-popup': 'PASS',            // 새 창 열림 — 결제창처럼 창이 뜨는 것 말고는 반응이 없는 경우
   'btn-modal-close': 'PASS',      // 모달 닫기
 };
 
@@ -72,7 +73,11 @@ function waitForServer(timeoutMs = 20000) {
     await page.goto(TARGET, { waitUntil: 'domcontentloaded' });
 
     const t0 = Date.now();
-    const results = await scanPage(page, TARGET, { observeMs: 2500, excludeRules: ['삭제', '탈퇴', '결제', '로그아웃'] });
+    const results = await scanPage(page, TARGET, {
+      observeMs: 2500,
+      excludeRules: ['삭제', '탈퇴', '로그아웃'],   // '결제'는 새 창 검증 대상이라 제외 목록에서 뺀다
+      clickNewTab: true,
+    });
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 
     // sel('button#btn-dom') 에서 id 를 뽑아 기대값과 대조한다

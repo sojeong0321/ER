@@ -12,7 +12,7 @@ const NAME = {
   ERROR: '에러', 'NO-RESPONSE': '무감', PASS: '정상',
   EXCLUDED: '검사 제외', UNCLICKABLE: '클릭 불가',
 };
-const SIGNAL = { dom: '화면 구조', net: '서버 요청', url: '주소 이동', vis: '화면 표시', console: 'JS 예외' };
+const SIGNAL = { dom: '화면 구조', net: '서버 요청', url: '주소 이동', vis: '화면 표시', scroll: '스크롤', popup: '새 창', console: 'JS 예외' };
 const ORDER = { ERROR: 0, 'NO-RESPONSE': 1, UNCLICKABLE: 2, PASS: 3, EXCLUDED: 4 };
 
 function counts(list) {

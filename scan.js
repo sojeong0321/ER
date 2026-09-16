@@ -42,6 +42,8 @@ if (!targetUrl || has('--help') || has('-h')) {
     --exclude "삭제,결제"       제외 규칙 (기본: ${(cfg.excludeRules || []).join(',')})
     --login                    config.json 의 로그인 정보 사용
     --session                  저장된 로그인 사용 (npm run login 으로 미리 저장)
+    --click-new-tab            새 탭으로 열리는 링크도 검사 (결제창 등 새 창 확인)
+    --click-external           다른 사이트로 나가는 링크도 검사
     --out <dir>                리포트 저장 경로 (기본: ${cfg.outputDir})
     --quiet                    요약만 출력
 
@@ -60,6 +62,8 @@ const excludeRules = val('--exclude', (cfg.excludeRules || []).join(','))
   .split(',').map(s => s.trim()).filter(Boolean);
 const useLogin = has('--login') || cfg.login?.enabled === true;
 const useSession = has('--session');
+const clickNewTab = has('--click-new-tab');
+const clickExternal = has('--click-external');
 const outputDir = path.resolve(val('--out', cfg.outputDir ?? 'report'));
 const quiet = has('--quiet');
 
@@ -127,7 +131,7 @@ const color = (s, t) => `${C[s] || ''}${t}${C.reset}`;
     if (ev.type === 'done') console.log(`      ${C.dim}→ ${ev.count}개 요소 검사 완료${C.reset}`);
     if (ev.type === 'pageError') console.log(`      ${color('ERROR', '접근 실패')} ${ev.msg}`);
     if (ev.type === 'limit') console.log(`  ${C.dim}최대 페이지 수(${ev.max}) 도달 — ${ev.skipped}개 건너뜀${C.reset}`);
-  }, { observeMs, excludeRules, maxPages, screenshotDir: ensureDir(path.join(outputDir, 'shots')) });
+  }, { observeMs, excludeRules, maxPages, clickNewTab, clickExternal, screenshotDir: ensureDir(path.join(outputDir, 'shots')) });
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   await browser.close();

@@ -186,6 +186,9 @@ async function scanPage(page, pageUrl, opts = {}) {
   const OBSERVE_MS = opts.observeMs ?? defaultCfg.observeMs ?? 2000;
   const EXCLUDE_RULES = (opts.excludeRules ?? defaultCfg.excludeRules ?? []).filter(Boolean);
   const shotDir = opts.screenshotDir || null;
+  // 새 창으로 뜨는 화면(결제창 등)을 검사하려면 새 탭 링크를 눌러봐야 한다
+  const CLICK_NEW_TAB = opts.clickNewTab === true;
+  const CLICK_EXTERNAL = opts.clickExternal === true;
   const onElement = opts.onElement || null;
   const shouldStop = opts.shouldStop || (() => false);
 
@@ -193,9 +196,18 @@ async function scanPage(page, pageUrl, opts = {}) {
   const startHost = (() => { try { return new URL(pageUrl).hostname; } catch { return ''; } })();
   const startSite = siteOf(startHost);
 
-  // 팝업·새 탭은 검사 흐름을 깨므로 열리는 즉시 닫는다
+  // 팝업·새 탭은 검사 흐름을 깨므로 닫되, "열렸다"는 사실은 신호로 남긴다.
+  // 결제창처럼 새 창으로 뜨는 화면은 이것 말고는 반응을 확인할 방법이 없다.
   const ctx = page.context();
-  const onPopup = p => { p.close().catch(() => {}); };
+  let clickInProgress = false;
+  let popupSeen = null;
+  const onPopup = async p => {
+    if (clickInProgress) {
+      const url = await Promise.resolve(p.url()).catch(() => '');
+      popupSeen = url || '(빈 창)';
+    }
+    p.close().catch(() => {});
+  };
   ctx.on('page', onPopup);
 
   try {
@@ -257,11 +269,11 @@ async function scanPage(page, pageUrl, opts = {}) {
           push({ ...base, status: 'EXCLUDED', reason: `${raw.split(':')[0]} 링크`, signals: {} });
           continue;
         }
-        if (abs && /^https?:$/.test(abs.protocol) && startSite && siteOf(abs.hostname) !== startSite) {
+        if (!CLICK_EXTERNAL && abs && /^https?:$/.test(abs.protocol) && startSite && siteOf(abs.hostname) !== startSite) {
           push({ ...base, status: 'EXCLUDED', reason: `다른 사이트 링크 (${abs.hostname})`, signals: {} });
           continue;
         }
-        if (info.target === '_blank') {
+        if (!CLICK_NEW_TAB && info.target === '_blank') {
           push({ ...base, status: 'EXCLUDED', reason: '새 탭 링크', signals: {} });
           continue;
         }
@@ -312,6 +324,8 @@ async function scanPage(page, pageUrl, opts = {}) {
 
       // ── 클릭 ──
       let clickFail = null;
+      popupSeen = null;
+      clickInProgress = true;
       clickedAt = Date.now();
       try {
         await locator.click({ timeout: 2500, noWaitAfter: true });
@@ -331,13 +345,14 @@ async function scanPage(page, pageUrl, opts = {}) {
         mut = m;
         if (waited < MIN_OBSERVE_MS) continue;
         const sig = freshSignals(m, noise);
-        if (sig.dom || sig.vis || sig.scroll || netHits > 0 || page.url() !== urlBefore) {
+        if (sig.dom || sig.vis || sig.scroll || popupSeen || netHits > 0 || page.url() !== urlBefore) {
           await page.waitForTimeout(SETTLE_MS).catch(() => {});
           mut = (await readWatch(page)) || m;
           break;
         }
       }
       const observedMs = Date.now() - t0;
+      clickInProgress = false;
 
       page.off('request', onReq);
       page.off('response', onResp);
@@ -359,6 +374,7 @@ async function scanPage(page, pageUrl, opts = {}) {
         console: jsError ? 1 : 0,
         vis: ex.vis ? 1 : 0,
         scroll: ex.scroll ? 1 : 0,
+        popup: popupSeen ? 1 : 0,
       };
 
       // ── 판정 ──
@@ -369,10 +385,11 @@ async function scanPage(page, pageUrl, opts = {}) {
         status = 'ERROR'; reason = `HTTP ${badStatus.status} — ${shortUrl(badStatus.url)}`;
       } else if (failedOwn) {
         status = 'ERROR'; reason = `요청 실패 — ${shortUrl(failedOwn)}`;
-      } else if (!signals.dom && !signals.net && !signals.url && !signals.vis && !signals.scroll) {
+      } else if (!signals.dom && !signals.net && !signals.url && !signals.vis && !signals.scroll && !signals.popup) {
         status = 'NO-RESPONSE'; reason = `클릭 후 ${(observedMs / 1000).toFixed(1)}초 동안 무변화`;
       } else {
-        status = 'PASS'; reason = describe(signals);
+        status = 'PASS';
+        reason = popupSeen ? `새 창이 열림 — ${shortUrl(popupSeen)}` : describe(signals);
       }
 
       // ── 결함만 스크린샷 ──
@@ -413,6 +430,7 @@ function describe(s) {
   if (s.url) hit.push('URL');
   if (s.vis) hit.push('화면');
   if (s.scroll) hit.push('스크롤');
+  if (s.popup) hit.push('새 창');
   return hit.join(' + ') + ' 변화 감지';
 }
 

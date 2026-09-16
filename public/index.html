@@ -312,6 +312,8 @@
       <label class="fld"><span>요소당 관찰 시간</span><input id="observeMs" type="number" value="2000" min="300" step="100" style="width:110px"></label>
       <label class="fld"><span>최대 페이지 수</span><input id="maxPages" type="number" value="50" min="1" style="width:100px"></label>
       <label class="fld wide"><span>클릭하지 않을 단어 <span class="opt">(쉼표로 구분)</span></span><input id="excl" value="삭제, 탈퇴, 결제, 로그아웃, 구매, 주문" placeholder="삭제, 발송, 승인" spellcheck="false"></label>
+      <label class="chk" title="결제창처럼 새 창으로 뜨는 화면을 확인하려면 켜세요. 창이 열리면 바로 닫고 '새 창 열림'으로 기록합니다."><input type="checkbox" id="clickNewTab"> 새 창 링크도 검사</label>
+      <label class="chk" title="다른 사이트로 나가는 링크까지 눌러봅니다. 검사 시간이 늘고 외부 사이트에 접속하게 됩니다."><input type="checkbox" id="clickExternal"> 외부 링크도 검사</label>
       <label class="chk"><input type="checkbox" id="loginOn"> 로그인이 필요한 화면</label>
       <div class="loginrow" id="loginRow">
         <div class="seg" id="authSeg" role="group" aria-label="로그인 방식">
@@ -486,7 +488,7 @@ const $ = id => document.getElementById(id);
 const socket = io();
 
 const LABEL = { ERROR:'에러', 'NO-RESPONSE':'무감', PASS:'정상', EXCLUDED:'검사 제외', UNCLICKABLE:'클릭 불가' };
-const SIGNAL = { dom:'화면 구조', net:'서버 요청', url:'주소 이동', vis:'화면 표시', console:'JS 예외' };
+const SIGNAL = { dom:'화면 구조', net:'서버 요청', url:'주소 이동', vis:'화면 표시', scroll:'스크롤', popup:'새 창', console:'JS 예외' };
 const ORDER = { ERROR:0, 'NO-RESPONSE':1, UNCLICKABLE:2, PASS:3, EXCLUDED:4 };
 
 let DATA = [], META = {}, filter = 'ALL', picked = null, scanId = null, running = false;
@@ -731,6 +733,8 @@ async function startScan() {
         excludeRules,
         observeMs: Number($('observeMs').value) || 2000,
         maxPages: Number($('maxPages').value) || 50,
+        clickNewTab: $('clickNewTab').checked,
+        clickExternal: $('clickExternal').checked,
       }),
     });
     const body = await res.json();
@@ -874,6 +878,8 @@ function rescan(entry) {
     if (st.observeMs) $('observeMs').value = st.observeMs;
     if (st.maxPages) $('maxPages').value = st.maxPages;
     if (Array.isArray(st.excludeRules)) $('excl').value = st.excludeRules.join(', ');
+    $('clickNewTab').checked = !!st.clickNewTab;
+    $('clickExternal').checked = !!st.clickExternal;
     if (st.authMode && st.authMode !== 'none') {
       $('loginOn').checked = true;
       $('loginRow').classList.add('open');
