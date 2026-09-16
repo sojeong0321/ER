@@ -86,6 +86,28 @@ app.get('/api/report/:scanId', (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
+/** Runner 상태 — 어떤 브라우저로, 어떤 설정으로 도는지 화면에 밝힌다 */
+let browserVersion = null;
+app.get('/api/runner', async (req, res) => {
+  if (!browserVersion) {
+    try {
+      const b = await chromium.launch({ args: ['--no-sandbox'] });
+      browserVersion = b.version();
+      await b.close();
+    } catch { browserVersion = '사용 불가'; }
+  }
+  const busy = [...scans.values()].some(s => s.status === 'running');
+  res.json({
+    browser: `chromium ${browserVersion}`,
+    version: require('./package.json').version,
+    observeMs: cfg.observeMs,
+    maxPages: cfg.maxPages,
+    viewport: '1440×900',
+    state: busy ? 'busy' : 'idle',
+    peers: io.engine.clientsCount,
+  });
+});
+
 /** 같은 사내망의 동료에게 알려줄 접속 주소 — 화면에 그대로 띄운다 */
 app.get('/api/info', (req, res) => {
   const port = server.address()?.port || PORT;
