@@ -6,9 +6,10 @@
   "scripts": {
     "start": "node server.js",
     "scan": "node scan.js",
-    "test": "node test/verify.js",
+    "test": "node test/verify.js && node test/verify-login.js",
     "postinstall": "playwright install chromium",
-    "login": "node login.js"
+    "login": "node login.js",
+    "test:login": "node test/verify-login.js"
   },
   "engines": {
     "node": ">=20"

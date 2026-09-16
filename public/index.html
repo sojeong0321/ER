@@ -22,6 +22,7 @@
     --r:10px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
   html{-webkit-text-size-adjust:100%}
   body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.55;font-size:15px;-webkit-font-smoothing:antialiased}
   button,input,select{font-family:inherit;font-size:inherit;color:inherit}
@@ -66,11 +67,25 @@
   .fld.wide input{min-width:250px}
   .chk{display:flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer;padding-bottom:9px}
   .chk input{width:16px;height:16px;accent-color:var(--ink)}
-  .hint{font-size:12.5px;color:var(--ink3);line-height:1.6}
+  .hint{font-size:12.5px;color:var(--ink3);line-height:1.6;display:block}
+  .authpane{width:100%;display:flex;flex-direction:column;gap:11px}
+  .credrow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .opt{color:var(--ink3);font-weight:400}
+  .loginwait,.saved{display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%}
+  .openbtn.sm{padding:8px 15px;font-size:13.5px}
+  .loginwait,.saved{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px}
+  .loginwait b,.saved b{display:block;font-size:14px}
+  .loginwait>div,.saved>div{flex:1;min-width:180px}
+  .saved .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex-shrink:0}
+  .openbtn{background:var(--ink);color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:620;white-space:nowrap}
+  .openbtn:hover{opacity:.86}
+  .openbtn:disabled{opacity:.4;cursor:not-allowed}
+  .linkbtn{color:var(--ink2);font-size:13px;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+  .linkbtn:hover{color:var(--ink)}
   .hint code{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12px}
   .note.warn{background:var(--nr-bg);border:1px solid var(--nr-line);color:#7d440a}
   .note.warn b{display:block;margin-bottom:3px;color:var(--nr)}
-  .loginrow{display:none;gap:10px;flex-wrap:wrap;width:100%}
+  .loginrow{display:none;flex-direction:column;gap:13px;width:100%;padding-top:4px}
   .loginrow.open{display:flex}
 
   /* ── 알림 ── */
@@ -249,13 +264,55 @@
       <label class="fld"><span>요소당 관찰 시간</span><input id="observeMs" type="number" value="2000" min="300" step="100" style="width:110px"></label>
       <label class="fld"><span>최대 페이지 수</span><input id="maxPages" type="number" value="50" min="1" style="width:100px"></label>
       <label class="fld wide"><span>클릭하지 않을 단어</span><input id="excl" value="삭제, 탈퇴, 결제, 로그아웃, 구매, 주문" spellcheck="false"></label>
-      <label class="chk" id="sessionWrap" hidden><input type="checkbox" id="sessionOn"> 저장된 로그인 사용 <span id="sessionAt" class="hint"></span></label>
-      <label class="chk"><input type="checkbox" id="loginOn"> 아이디·비밀번호로 로그인</label>
+      <label class="chk"><input type="checkbox" id="loginOn"> 로그인이 필요한 화면</label>
       <div class="loginrow" id="loginRow">
-        <p class="hint" style="width:100%;margin:-2px 0 2px">OTP 같은 2단계 인증이 있는 화면은 이 방식으로 들어갈 수 없습니다. 터미널에서 <code>npm run login &lt;로그인 주소&gt;</code> 를 실행해 직접 한 번 로그인해두세요.</p>
-        <label class="fld"><span>로그인 주소</span><input id="loginUrl" placeholder="https://.../login" style="min-width:230px"></label>
-        <label class="fld"><span>아이디</span><input id="loginId" autocomplete="off" style="width:150px"></label>
-        <label class="fld"><span>비밀번호</span><input id="loginPw" type="password" autocomplete="off" style="width:150px"></label>
+        <div class="seg" id="authSeg" role="group" aria-label="로그인 방식">
+          <button type="button" data-m="credentials" aria-pressed="true">아이디·비밀번호</button>
+          <button type="button" data-m="session" aria-pressed="false">직접 로그인</button>
+        </div>
+
+        <!-- 아이디·비밀번호로 로그인 -->
+        <div class="authpane" id="paneCred">
+          <div class="credrow">
+            <label class="fld"><span>로그인 주소</span><input id="loginUrl" placeholder="https://example.co.kr/login" style="min-width:260px"></label>
+            <label class="fld"><span>아이디</span><input id="loginId" autocomplete="off" style="width:130px"></label>
+            <label class="fld"><span>비밀번호</span><input id="loginPw" type="password" autocomplete="new-password" style="width:130px"></label>
+            <label class="fld"><span>OTP <span class="opt">(있으면)</span></span><input id="loginOtp" autocomplete="off" placeholder="123123" style="width:160px"></label>
+          </div>
+          <div class="credrow">
+            <button type="button" class="openbtn sm" id="saveCredBtn">이 PC에 저장</button>
+            <button type="button" class="linkbtn" id="checkOtpBtn">OTP 값 확인</button>
+            <button type="button" class="linkbtn" id="forgetCredBtn" hidden>저장된 계정 지우기</button>
+            <span class="hint" id="credState"></span>
+          </div>
+          <p class="hint" style="width:100%">
+            OTP 칸에는 <b>넣을 값을 그대로</b> 적으면 됩니다. 개발 서버에서 <code>123123</code> 처럼 통하는 고정 코드가 있다면 그 값을 넣으세요.<br>
+            인증 앱(Authenticator)을 쓴다면 앱 등록 화면의 비밀키를 넣으면 코드를 매번 새로 만들어 입력합니다. 문자·이메일로 받는 OTP는 <b>직접 로그인</b>을 쓰세요.
+          </p>
+        </div>
+
+        <!-- 직접 로그인해서 상태 저장 -->
+        <div class="authpane" id="paneSession" hidden>
+          <div class="saved" id="savedBox" hidden>
+            <span class="dot"></span>
+            <div><b>로그인된 상태로 검사합니다</b><span class="hint" id="savedAt"></span></div>
+            <button type="button" class="linkbtn" id="reloginBtn">다시 로그인</button>
+            <button type="button" class="linkbtn" id="forgetBtn">로그인 지우기</button>
+          </div>
+
+          <div class="credrow" id="loginForm">
+            <label class="fld"><span>로그인 주소</span><input id="sessionUrl" placeholder="https://example.co.kr/login" style="min-width:290px"></label>
+            <button type="button" class="openbtn" id="openLoginBtn">로그인 창 열기</button>
+            <p class="hint" style="width:100%">로그인 창이 이 PC 화면에 뜹니다. 직접 로그인하세요. OTP·SSO 무엇이든 통과할 수 있습니다.</p>
+          </div>
+
+          <div class="loginwait" id="loginWait" hidden>
+            <span class="pulse"></span>
+            <div><b>로그인 창에서 로그인하세요</b><span class="hint">원하는 화면이 보이면 아래 버튼을 누르세요.</span></div>
+            <button type="button" class="openbtn" id="doneLoginBtn">로그인 다 했어요</button>
+            <button type="button" class="linkbtn" id="cancelLoginBtn">취소</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -381,10 +438,7 @@ $('moreBtn').addEventListener('click', () => {
   $('moreBtn').setAttribute('aria-expanded', String(open));
   $('moreBtn').textContent = open ? '세부 설정 접기' : '세부 설정';
 });
-$('loginOn').addEventListener('change', e => {
-  $('loginRow').classList.toggle('open', e.target.checked);
-  if (e.target.checked) $('sessionOn').checked = false;
-});
+$('loginOn').addEventListener('change', e => $('loginRow').classList.toggle('open', e.target.checked));
 $('url').addEventListener('keydown', e => { if (e.key === 'Enter') startScan(); });
 $('goBtn').addEventListener('click', startScan);
 $('stopBtn').addEventListener('click', stopScan);
@@ -416,17 +470,132 @@ fetch('/api/info').then(r => r.json()).then(info => {
   $('share').hidden = false;
 }).catch(() => {});
 
-/* ── 저장된 로그인 ── */
-fetch('/api/session').then(r => r.json()).then(info => {
-  if (!info.exists) return;
-  $('sessionWrap').hidden = false;
-  $('sessionOn').checked = true;
-  $('sessionAt').textContent = info.savedAt
-    ? `(${new Date(info.savedAt).toLocaleString('ko-KR')} 저장)` : '';
-}).catch(() => {});
+/* ── 로그인 ── */
+let authMode = 'credentials';
+let hasSession = false, hasCred = false;
 
-$('sessionOn').addEventListener('change', e => {
-  if (e.target.checked) { $('loginOn').checked = false; $('loginRow').classList.remove('open'); }
+$('authSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  authMode = b.dataset.m;
+  [...$('authSeg').children].forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  $('paneCred').hidden = authMode !== 'credentials';
+  $('paneSession').hidden = authMode !== 'session';
+});
+
+function paintSession(info) {
+  hasSession = !!info.exists;
+  $('savedBox').hidden = !hasSession;
+  $('loginForm').hidden = hasSession;
+  $('loginWait').hidden = true;
+  if (hasSession) {
+    $('savedAt').textContent = (info.savedAt ? `${new Date(info.savedAt).toLocaleString('ko-KR')} 저장` : '') +
+      (info.url ? ` · ${info.url}` : '');
+  }
+}
+
+function paintCred(info) {
+  hasCred = !!info.exists;
+  $('forgetCredBtn').hidden = !hasCred;
+  if (!hasCred) { $('credState').textContent = ''; return; }
+  if (info.url && !$('loginUrl').value) $('loginUrl').value = info.url;
+  if (info.username && !$('loginId').value) $('loginId').value = info.username;
+  const bits = [];
+  if (info.hasPassword) bits.push('비밀번호');
+  if (info.hasOtp) bits.push('OTP');
+  $('credState').textContent =
+    `${bits.join('·')} 저장됨 (${new Date(info.savedAt).toLocaleString('ko-KR')}) — 값은 화면에 표시하지 않습니다`;
+  $('loginPw').placeholder = info.hasPassword ? '저장된 값 사용' : '';
+  $('loginOtp').placeholder = info.hasOtp ? '저장된 값 사용' : '123123';
+}
+
+const loadSession = () => fetch('/api/session').then(r => r.json()).then(paintSession).catch(() => {});
+const loadCred = () => fetch('/api/credentials').then(r => r.json()).then(paintCred).catch(() => {});
+loadSession(); loadCred();
+
+$('saveCredBtn').addEventListener('click', async () => {
+  const body = {
+    url: $('loginUrl').value.trim(),
+    username: $('loginId').value.trim(),
+    password: $('loginPw').value,
+    otp: $('loginOtp').value.trim(),
+  };
+  if (!body.url || !body.username) { toast('로그인 주소와 아이디를 입력하세요'); return; }
+  try {
+    const res = await fetch('/api/credentials', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error);
+    $('loginPw').value = ''; $('loginOtp').value = '';
+    await loadCred();
+    toast('이 PC에 저장했습니다');
+  } catch (e) { toast(e.message || '저장하지 못했습니다'); }
+});
+
+$('checkOtpBtn').addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/otp/check', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ otp: $('loginOtp').value.trim() }),
+    });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error);
+    toast(out.kind === 'fixed'
+      ? `입력한 값 그대로 "${out.code}" 을 넣습니다`
+      : `비밀키로 만든 코드는 ${out.code} 입니다 (${out.secondsLeft}초 남음). 인증 앱과 같은지 확인하세요`);
+  } catch (e) { toast(e.message || 'OTP 코드를 만들지 못했습니다'); }
+});
+
+$('forgetCredBtn').addEventListener('click', async () => {
+  if (!confirm('저장된 계정 정보를 지울까요?')) return;
+  await fetch('/api/credentials', { method: 'DELETE' }).catch(() => {});
+  $('loginPw').value = ''; $('loginOtp').value = '';
+  await loadCred();
+  toast('저장된 계정 정보를 지웠습니다');
+});
+
+$('openLoginBtn').addEventListener('click', async () => {
+  const url = $('sessionUrl').value.trim() || $('loginUrl').value.trim() || $('url').value.trim();
+  if (!url) { toast('로그인 주소를 입력하세요'); $('sessionUrl').focus(); return; }
+  $('openLoginBtn').disabled = true;
+  $('openLoginBtn').textContent = '창을 여는 중…';
+  try {
+    const res = await fetch('/api/session/open', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }),
+    });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error);
+    $('loginForm').hidden = true;
+    $('loginWait').hidden = false;
+  } catch (e) { toast(e.message || '로그인 창을 열지 못했습니다'); }
+  finally { $('openLoginBtn').disabled = false; $('openLoginBtn').textContent = '로그인 창 열기'; }
+});
+
+$('doneLoginBtn').addEventListener('click', async () => {
+  $('doneLoginBtn').disabled = true;
+  try {
+    const res = await fetch('/api/session/save', { method: 'POST' });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error);
+    await loadSession();
+    toast(`로그인을 저장했습니다 (쿠키 ${out.cookies}개)`);
+  } catch (e) { toast(e.message || '저장하지 못했습니다'); }
+  finally { $('doneLoginBtn').disabled = false; }
+});
+
+$('cancelLoginBtn').addEventListener('click', async () => {
+  await fetch('/api/session/cancel', { method: 'POST' }).catch(() => {});
+  $('loginWait').hidden = true; $('loginForm').hidden = false;
+});
+
+$('reloginBtn').addEventListener('click', () => { $('savedBox').hidden = true; $('loginForm').hidden = false; });
+
+$('forgetBtn').addEventListener('click', async () => {
+  if (!confirm('저장된 로그인을 지울까요?')) return;
+  await fetch('/api/session', { method: 'DELETE' }).catch(() => {});
+  await loadSession();
+  $('loginForm').hidden = false;
+  toast('저장된 로그인을 지웠습니다');
 });
 
 /* ── 스캔 ── */
@@ -456,19 +625,34 @@ async function startScan() {
   $('stopBtn').style.display = '';
   running = true;
 
-  const useSession = $('sessionOn').checked;
-  const login = $('loginOn').checked ? {
-    enabled: true,
-    url: $('loginUrl').value.trim(),
-    username: $('loginId').value.trim(),
-    password: $('loginPw').value,
-  } : { enabled: false };
+  let mode = 'none', login = null;
+  if ($('loginOn').checked) {
+    mode = authMode;
+    if (mode === 'session' && !hasSession) {
+      toast('먼저 로그인 창을 열어 로그인해 주세요');
+      $('adv').classList.add('open'); $('loginRow').classList.add('open');
+      return;
+    }
+    if (mode === 'credentials') {
+      login = {
+        url: $('loginUrl').value.trim(),
+        username: $('loginId').value.trim(),
+        password: $('loginPw').value,
+        otp: $('loginOtp').value.trim(),
+      };
+      if (!login.url || !login.username || (!login.password && !hasCred)) {
+        toast('로그인 주소·아이디·비밀번호를 입력하세요');
+        $('adv').classList.add('open'); $('loginRow').classList.add('open');
+        return;
+      }
+    }
+  }
 
   try {
     const res = await fetch('/api/scan', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        url, scope, login, useSession,
+        url, scope, authMode: mode, login,
         excludeRules,
         observeMs: Number($('observeMs').value) || 2000,
         maxPages: Number($('maxPages').value) || 50,

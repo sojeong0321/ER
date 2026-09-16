@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>ER 로그인 검증용 페이지</title>
+<style>
+  body{font-family:system-ui,-apple-system,'Malgun Gothic',sans-serif;max-width:360px;margin:60px auto;padding:0 20px;color:#1a1d26}
+  h1{font-size:18px;margin-bottom:4px}
+  p.sub{color:#6b7280;font-size:13px;margin-bottom:22px}
+  input{display:block;width:100%;padding:10px 12px;margin-bottom:9px;border:1px solid #d6dae2;border-radius:7px;font:inherit;font-size:14px}
+  button{width:100%;padding:11px;border:none;border-radius:7px;background:#16181d;color:#fff;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+  #msg{margin-top:12px;font-size:13px;color:#c62a1f;min-height:18px}
+</style></head>
+<body>
+<!--
+  실제 사내 시스템과 같은 조건으로 만든 로그인 화면이다.
+  - 아이디 칸에 name·id 가 없다
+  - form 태그가 없다
+  - OTP 입력칸이 아이디·비밀번호와 같은 화면에 있다
+  이 조건에서 자동 로그인이 되는지 test/verify-login.js 가 검증한다.
+-->
+<h1>D-TEST 로그인</h1>
+<p class="sub">ER 로그인 자동화 검증용 화면입니다.</p>
+
+<input type="text" placeholder="아이디">
+<input type="password" id="password" placeholder="비밀번호">
+<input type="text" placeholder="OTP">
+<button class="loginBtn">로그인</button>
+<div id="msg"></div>
+
+<script>
+  document.querySelector('.loginBtn').addEventListener('click', async () => {
+    const [idEl, otpEl] = document.querySelectorAll('input[type=text]');
+    const res = await fetch('/api/_test/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: idEl.value,
+        pw: document.getElementById('password').value,
+        otp: otpEl.value,
+      }),
+    });
+    const out = await res.json();
+    if (out.ok) location.href = '/test-target.html';
+    else document.getElementById('msg').textContent = out.error;
+  });
+</script>
+</body>
+</html>

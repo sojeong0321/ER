@@ -13,8 +13,10 @@
  */
 const fs = require('fs');
 const path = require('path');
+const totp = require('./totp');
 
 const SESSION_FILE = path.join(__dirname, '..', 'auth.local.json');
+const CRED_FILE = path.join(__dirname, '..', 'credentials.local.json');
 
 /* ────────────────── 저장된 세션 ────────────────── */
 
@@ -28,6 +30,18 @@ function readSession() {
     const raw = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'));
     return { state: raw.state ?? raw, savedAt: raw.savedAt || null, url: raw.url || null };
   } catch { return null; }
+}
+
+/** 로그인 상태를 파일로 저장한다 */
+function saveSession(state, landedOn) {
+  const savedAt = new Date().toISOString();
+  fs.writeFileSync(SESSION_FILE, JSON.stringify({ savedAt, url: landedOn, state }, null, 2), 'utf8');
+  return { savedAt, file: SESSION_FILE };
+}
+
+/** 저장된 로그인을 지운다 */
+function clearSession() {
+  if (fs.existsSync(SESSION_FILE)) fs.unlinkSync(SESSION_FILE);
 }
 
 /**
@@ -64,6 +78,50 @@ async function captureSession(loginUrl, waitForUser, opts = {}) {
   return summary;
 }
 
+/* ────────────────── 저장된 계정 정보 ────────────────── */
+
+/**
+ * 계정 정보를 이 PC 에 저장한다.
+ * 비밀번호와 OTP 비밀키는 저장은 하되 화면으로 되돌려주지 않는다.
+ * 이 서버는 사내망에 열려 있을 수 있어, 접속만 하면 값을 볼 수 있으면 안 되기 때문이다.
+ */
+function saveCredentials(cred) {
+  const prev = readCredentials() || {};
+  const next = {
+    url: cred.url ?? prev.url ?? '',
+    username: cred.username ?? prev.username ?? '',
+    // 빈 값으로 덮어써 지워지는 일이 없도록, 값이 들어온 항목만 갱신한다
+    password: cred.password || prev.password || '',
+    otp: cred.otp || prev.otp || '',
+    savedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(CRED_FILE, JSON.stringify(next, null, 2), 'utf8');
+  return next;
+}
+
+function readCredentials() {
+  if (!fs.existsSync(CRED_FILE)) return null;
+  try { return JSON.parse(fs.readFileSync(CRED_FILE, 'utf8')); } catch { return null; }
+}
+
+function clearCredentials() {
+  if (fs.existsSync(CRED_FILE)) fs.unlinkSync(CRED_FILE);
+}
+
+/** 화면에 보여줘도 되는 정보만 추린다 */
+function describeCredentials() {
+  const c = readCredentials();
+  if (!c) return { exists: false };
+  return {
+    exists: true,
+    url: c.url || '',
+    username: c.username || '',
+    hasPassword: !!c.password,
+    hasOtp: !!c.otp,
+    savedAt: c.savedAt || null,
+  };
+}
+
 /* ────────────────── 자동 로그인 ────────────────── */
 
 async function firstVisible(page, selectors) {
@@ -87,24 +145,111 @@ async function detectSecondFactor(page) {
   }).catch(() => null);
 }
 
+/** 화면에 보이는 OTP 입력칸을 찾아 선택자를 붙여 반환한다 (없으면 null) */
+async function markOtpField(page) {
+  return page.evaluate(() => {
+    const hit = [...document.querySelectorAll('input')].find(el => {
+      if (!(el.offsetWidth || el.offsetHeight)) return false;
+      if (el.value) return false;                       // 이미 채워진 칸은 건너뛴다
+      const hint = ((el.placeholder || '') + ' ' + (el.name || '') + ' ' + (el.id || '') + ' ' +
+                    (el.getAttribute('autocomplete') || '')).toLowerCase();
+      return /otp|one-?time|2fa|mfa|인증번호|인증코드|보안코드/.test(hint);
+    });
+    if (!hit) return null;
+    hit.setAttribute('data-er-otp', '1');
+    return "input[data-er-otp='1']";
+  }).catch(() => null);
+}
+
+/**
+ * OTP 칸이 있으면 비밀키로 코드를 만들어 채운다.
+ * 코드가 곧 만료될 참이면 다음 코드가 나올 때까지 기다린 뒤 채운다.
+ */
+async function fillOtp(page, otpValue, log) {
+  const sel = await markOtpField(page);
+  if (!sel) return false;
+  if (!otpValue) throw new Error('OTP_REQUIRED');
+
+  const { code, kind } = totp.resolveCode(otpValue);
+
+  if (kind === 'generated') {
+    // 코드가 곧 바뀔 참이면 다음 코드가 나올 때까지 기다린다
+    const left = totp.secondsLeft(otpValue);
+    if (left < 5) {
+      log?.(`OTP 코드가 ${left}초 뒤 바뀝니다. 다음 코드를 기다립니다…`);
+      await page.waitForTimeout((left + 1) * 1000);
+      await page.fill(sel, totp.generate(otpValue));
+      log?.('OTP 코드를 만들어 입력했습니다.');
+      return true;
+    }
+  }
+
+  await page.fill(sel, code);
+  log?.(kind === 'fixed' ? 'OTP 코드를 입력했습니다.' : 'OTP 코드를 만들어 입력했습니다.');
+  return true;
+}
+
+/**
+ * 로그인이 끝났는지 기다린다.
+ *
+ * 제출 직후에는 아직 요청이 시작되지도 않았을 수 있다. 그 시점에 화면을 보고 판정하면
+ * 멀쩡히 성공하는 로그인도 실패로 단정하게 되므로, 로그인 화면을 벗어날 때까지 지켜본다.
+ */
+async function waitLoggedIn(page, successIndicator, timeoutMs = 15000) {
+  const t0 = Date.now();
+  let lastMessage = '';
+  while (Date.now() - t0 < timeoutMs) {
+    if (successIndicator) {
+      if (await page.locator(successIndicator).first().count().catch(() => 0)) return { ok: true };
+    } else {
+      const onLoginScreen = await page.locator("input[type='password']").first().isVisible().catch(() => false);
+      if (!onLoginScreen) return { ok: true };
+    }
+    // 화면에 뜬 실패 메시지를 잡아두면 원인을 그대로 전달할 수 있다
+    const msg = await page.evaluate(() => {
+      const el = [...document.querySelectorAll('*')].find(e =>
+        e.children.length === 0 && /올바르지 않|실패|확인해|잘못|틀렸/.test(e.textContent || ''));
+      return el ? el.textContent.trim().slice(0, 120) : '';
+    }).catch(() => '');
+    if (msg) lastMessage = msg;
+    await page.waitForTimeout(400);
+  }
+  return { ok: false, message: lastMessage };
+}
+
+/** 로그인 제출 — 버튼을 찾지 못하면 비밀번호 칸에서 Enter 로 시도한다 */
+async function submitLogin(page, submitSelector, fallbackField) {
+  const submit = await firstVisible(page, [
+    submitSelector,
+    "button[type='submit']", "input[type='submit']",
+    "button.loginBtn", "[class*='login' i][type='button']",
+  ]);
+  if (submit) await submit.click().catch(() => {});
+  else await fallbackField?.press('Enter').catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
+}
+
+/**
+ * 아이디·비밀번호(필요하면 OTP)를 채워 로그인한다.
+ *
+ * @param {string} cfg.otp OTP 칸에 넣을 값. 숫자만 있으면 그대로 입력하고(개발 서버의 고정 코드),
+ *                         인증 앱 비밀키면 지금 시각의 코드를 만들어 입력한다.
+ * @param {function} cfg.onLog 진행 상황 알림
+ */
 async function doLogin(page, cfg) {
   const { url, username, password, submitSelector, successIndicator } = cfg;
+  const otpValue = cfg.otp || cfg.totpSecret;   // 고정 코드 또는 인증 앱 비밀키
+  const log = cfg.onLog;
   if (!url) throw new Error('로그인 주소가 비어 있습니다.');
 
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
   await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
 
-  const second = await detectSecondFactor(page);
-  if (second) {
-    throw new Error(
-      `이 화면은 2단계 인증('${second}')을 요구합니다. 아이디·비밀번호만으로는 로그인할 수 없습니다. ` +
-      `터미널에서 "npm run login ${url}" 을 실행해 직접 한 번 로그인한 뒤, 저장된 로그인 상태로 검사하세요.`);
-  }
-
   const pw = await firstVisible(page, [cfg.passwordSelector, "input[type='password']"]);
   if (!pw) throw new Error('로그인 화면에서 비밀번호 입력칸을 찾지 못했습니다. 로그인 주소가 맞는지 확인하세요.');
 
-  // 비밀번호 칸을 기준으로 그 앞의 보이는 텍스트 입력칸을 아이디로 본다 (name·id 가 없는 폼이 흔하다)
+  // 비밀번호 칸을 기준으로 그 앞의 보이는 텍스트 입력칸을 아이디로 본다.
+  // name·id 가 없고 form 태그조차 없는 로그인 화면이 흔하기 때문이다.
   const userSel = await page.evaluate(() => {
     const pwEl = [...document.querySelectorAll("input[type='password']")].find(el => el.offsetWidth || el.offsetHeight);
     if (!pwEl) return null;
@@ -127,26 +272,45 @@ async function doLogin(page, cfg) {
   await page.fill(userSel, username);
   await pw.fill(password);
 
-  const submit = await firstVisible(page, [
-    submitSelector,
-    "button[type='submit']", "input[type='submit']",
-    "button.loginBtn", "[class*='login' i][role='button']",
-  ]);
-  if (submit) {
-    await submit.click();
-  } else {
-    // 제출 버튼을 못 찾으면 비밀번호 칸에서 Enter 로 제출을 시도한다
-    await pw.press('Enter');
+  // 같은 화면에 OTP 칸이 함께 있는 경우 (아이디·비밀번호·OTP 한 번에 입력하는 방식)
+  try {
+    await fillOtp(page, otpValue, log);
+  } catch (e) {
+    if (e.message === 'OTP_REQUIRED') throw new Error(otpGuide());
+    throw e;
   }
-  await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
 
-  if (successIndicator) {
-    const ok = await page.locator(successIndicator).first().count().catch(() => 0);
-    if (!ok) throw new Error('로그인에 실패했습니다. 성공 확인 요소를 찾지 못했습니다.');
-  } else {
-    const stillThere = await page.locator("input[type='password']").first().isVisible().catch(() => false);
-    if (stillThere) throw new Error('로그인에 실패했습니다. 아이디·비밀번호를 확인하세요.');
+  await submitLogin(page, submitSelector, pw);
+  await page.waitForTimeout(600);   // 제출 직후에는 아직 화면이 그대로일 수 있다
+
+  // 제출 후 OTP 칸이 나타나는 경우 (2단계로 나뉜 방식)
+  try {
+    if (await fillOtp(page, otpValue, log)) {
+      await submitLogin(page, submitSelector, null);
+    }
+  } catch (e) {
+    if (e.message === 'OTP_REQUIRED') throw new Error(otpGuide());
+    throw e;
+  }
+
+  // 성공 확인 — 제출 결과가 화면에 반영될 때까지 지켜본다
+  const done = await waitLoggedIn(page, successIndicator);
+  if (!done.ok) {
+    if (done.message) throw new Error(`로그인에 실패했습니다: ${done.message}`);
+    throw new Error(otpValue
+      ? '로그인에 실패했습니다. 아이디·비밀번호와 OTP 값을 확인하세요.'
+      : '로그인에 실패했습니다. 아이디·비밀번호를 확인하세요.');
   }
 }
 
-module.exports = { doLogin, captureSession, readSession, hasSession, sessionPath, detectSecondFactor };
+function otpGuide() {
+  return '이 화면은 OTP 입력을 요구합니다. OTP 칸에 넣을 값을 알려주세요. ' +
+    '개발 서버에서 통하는 고정 코드가 있으면 그 값을, 인증 앱을 쓴다면 앱의 비밀키를 넣으면 됩니다. ' +
+    '문자·이메일로 받는 방식이라면 "직접 로그인"으로 한 번 로그인해 상태를 저장하세요.';
+}
+
+module.exports = {
+  doLogin, captureSession, markOtpField, detectSecondFactor,
+  readSession, saveSession, clearSession, hasSession, sessionPath,
+  saveCredentials, readCredentials, clearCredentials, describeCredentials,
+};

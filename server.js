@@ -11,7 +11,9 @@ const path = require('path');
 const crypto = require('crypto');
 const { Server } = require('socket.io');
 const { chromium } = require('playwright');
-const { doLogin, readSession } = require('./src/login');
+const login_ = require('./src/login');
+const { doLogin, readSession, saveSession, clearSession } = login_;
+const totp = require('./src/totp');
 const { crawl } = require('./src/crawler');
 const { saveHtml, saveExcel } = require('./src/reporter');
 const cfg = require('./config.json');
@@ -43,7 +45,7 @@ function emitter(scanId) {
 }
 
 app.post('/api/scan', (req, res) => {
-  const { url, scope, login, excludeRules, observeMs, maxPages, useSession } = req.body || {};
+  const { url, scope, login, excludeRules, observeMs, maxPages, authMode } = req.body || {};
   if (!url || !/^https?:\/\//i.test(String(url))) {
     return res.status(400).json({ error: 'http:// 또는 https:// 로 시작하는 URL을 입력하세요.' });
   }
@@ -59,7 +61,7 @@ app.post('/api/scan', (req, res) => {
     url: String(url).trim(),
     scope: scope || cfg.scope || 'path',
     login,
-    useSession: !!useSession,
+    authMode: authMode || 'none',
     excludeRules,
     observeMs: Number(observeMs) || cfg.observeMs || 2000,
     maxPages: Number(maxPages) || cfg.maxPages || 50,
@@ -94,7 +96,126 @@ app.get('/api/info', (req, res) => {
 /** 저장된 로그인 세션이 있는지 알려준다 */
 app.get('/api/session', (req, res) => {
   const s = readSession();
-  res.json(s ? { exists: true, savedAt: s.savedAt, url: s.url } : { exists: false });
+  res.json({
+    ...(s ? { exists: true, savedAt: s.savedAt, url: s.url } : { exists: false }),
+    pending: !!loginSession,
+  });
+});
+
+/**
+ * 로그인용 브라우저 창을 띄운다.
+ * 사람이 직접 로그인해야 통과되는 인증(OTP·SSO)이 있어도 이 경로로 세션을 확보할 수 있다.
+ * 창은 이 서버가 실행 중인 PC 화면에 뜬다.
+ */
+let loginSession = null;   // { browser, context, page, url }
+
+app.post('/api/session/open', async (req, res) => {
+  const { url } = req.body || {};
+  if (!url || !/^https?:\/\//i.test(String(url))) {
+    return res.status(400).json({ error: 'http:// 또는 https:// 로 시작하는 로그인 주소를 입력하세요.' });
+  }
+  if (loginSession) {
+    try { await loginSession.browser.close(); } catch {}
+    loginSession = null;
+  }
+  try {
+    const browser = await chromium.launch({ headless: false, args: ['--no-sandbox'] });
+    const context = await browser.newContext({
+      ignoreHTTPSErrors: cfg.ignoreHTTPSErrors !== false,
+      viewport: { width: 1440, height: 900 },
+    });
+    const page = await context.newPage();
+    await page.goto(String(url).trim(), { waitUntil: 'domcontentloaded', timeout: 30000 });
+    loginSession = { browser, context, page, url: String(url).trim() };
+
+    // 사용자가 창을 그냥 닫으면 상태를 정리한다
+    browser.on('disconnected', () => { loginSession = null; });
+
+    res.json({ ok: true });
+  } catch (e) {
+    loginSession = null;
+    res.status(500).json({ error: `로그인 창을 열지 못했습니다: ${String(e.message).split('\n')[0]}` });
+  }
+});
+
+/** 로그인이 끝난 상태를 저장한다 */
+app.post('/api/session/save', async (req, res) => {
+  if (!loginSession) return res.status(400).json({ error: '열려 있는 로그인 창이 없습니다. 먼저 로그인 창을 여세요.' });
+  try {
+    const state = await loginSession.context.storageState();
+    const landedOn = loginSession.page.url();
+    const info = saveSession(state, landedOn);
+    await loginSession.browser.close().catch(() => {});
+    loginSession = null;
+    res.json({ ok: true, cookies: state.cookies.length, landedOn, savedAt: info.savedAt });
+  } catch (e) {
+    res.status(500).json({ error: `저장하지 못했습니다: ${String(e.message).split('\n')[0]}` });
+  }
+});
+
+/** 로그인 창을 닫는다 (저장하지 않음) */
+app.post('/api/session/cancel', async (req, res) => {
+  if (loginSession) {
+    await loginSession.browser.close().catch(() => {});
+    loginSession = null;
+  }
+  res.json({ ok: true });
+});
+
+/** 저장된 로그인을 지운다 */
+app.delete('/api/session', (req, res) => {
+  clearSession();
+  res.json({ ok: true });
+});
+
+/* ── 계정 정보 ── */
+
+app.get('/api/credentials', (req, res) => res.json(login_.describeCredentials()));
+
+app.post('/api/credentials', (req, res) => {
+  const { url, username, password, otp } = req.body || {};
+  if (otp) {
+    const kind = totp.describeInput(otp);
+    if (kind.kind === 'invalid') return res.status(400).json({ error: kind.error });
+  }
+  const saved = login_.saveCredentials({ url, username, password, otp });
+  res.json({ ok: true, savedAt: saved.savedAt });
+});
+
+app.delete('/api/credentials', (req, res) => {
+  login_.clearCredentials();
+  res.json({ ok: true });
+});
+
+/** OTP 입력값을 확인한다 — 실제로 어떤 값이 입력될지 미리 보여준다 */
+app.post('/api/otp/check', (req, res) => {
+  const value = req.body?.otp || login_.readCredentials()?.otp;
+  if (!value) return res.status(400).json({ error: 'OTP 값이 비어 있습니다.' });
+  const kind = totp.describeInput(value);
+  if (kind.kind === 'invalid') return res.status(400).json({ error: kind.error });
+  if (kind.kind === 'fixed') return res.json({ ok: true, kind: 'fixed', code: String(value).trim() });
+  res.json({ ok: true, kind: 'generated', code: totp.generate(value), secondsLeft: totp.secondsLeft(value) });
+});
+
+/** 로그인 자동화 검증용 화면 — 실제 사내 시스템과 같은 조건(이름 없는 입력칸·form 없음·OTP) */
+app.get('/test-login.html', (req, res) => res.sendFile(path.join(__dirname, 'test-login.html')));
+
+const TEST_ACCOUNT = { id: 'tester', pw: 'test1234', secret: 'JBSWY3DPEHPK3PXP', fixedCode: '123123' };
+app.post('/api/_test/login', (req, res) => {
+  const { id, pw, otp } = req.body || {};
+  if (id !== TEST_ACCOUNT.id || pw !== TEST_ACCOUNT.pw) {
+    return res.json({ ok: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+  }
+  // 시계 오차를 감안해 앞뒤 한 칸까지 인정한다 (표준 구현과 동일)
+  const now = Date.now();
+  // 개발 서버가 흔히 그렇듯 고정 코드도 통과시킨다
+  const valid = [TEST_ACCOUNT.fixedCode, ...[-30000, 0, 30000].map(d => totp.generate(TEST_ACCOUNT.secret, now + d))];
+  if (!valid.includes(String(otp))) {
+    return res.json({ ok: false, error: 'OTP 코드가 올바르지 않습니다.' });
+  }
+  res.cookie?.('er_test_session', '1');
+  res.setHeader('Set-Cookie', 'er_test_session=1; Path=/; SameSite=Lax');
+  res.json({ ok: true });
 });
 
 /** 회귀 테스트용 대상 페이지 */
@@ -107,7 +228,7 @@ app.get('/api/_test/ok', (req, res) => res.json({ ok: true }));
 async function runScan(scanId, options) {
   const scan = scans.get(scanId);
   const emit = emitter(scanId);
-  const { url, scope, login, useSession, excludeRules, observeMs, maxPages } = options;
+  const { url, scope, login, authMode, excludeRules, observeMs, maxPages } = options;
   let browser = null;
 
   try {
@@ -121,11 +242,9 @@ async function runScan(scanId, options) {
     }
 
     let storageState;
-    if (useSession) {
+    if (authMode === 'session') {
       const saved = readSession();
-      if (!saved) {
-        throw new Error('저장된 로그인이 없습니다. 터미널에서 "npm run login <로그인 주소>" 를 먼저 실행하세요.');
-      }
+      if (!saved) throw new Error('저장된 로그인이 없습니다. 먼저 로그인 창을 열어 로그인해 주세요.');
       storageState = saved.state;
       emit('log', { msg: `저장된 로그인으로 검사합니다 (${new Date(saved.savedAt).toLocaleString('ko-KR')} 저장).` });
     }
@@ -138,10 +257,23 @@ async function runScan(scanId, options) {
     });
     const page = await context.newPage();
 
-    if (!useSession && login?.enabled && login?.username) {
+    if (authMode === 'credentials') {
+      // 화면에서 받은 값이 없으면 이 PC 에 저장된 계정 정보를 쓴다
+      const saved = login_.readCredentials() || {};
+      const merged = {
+        ...cfg.login,
+        url: login?.url || saved.url,
+        username: login?.username || saved.username,
+        password: login?.password || saved.password,
+        otp: login?.otp || saved.otp,
+        onLog: msg => emit('log', { msg }),
+      };
+      if (!merged.url) throw new Error('로그인 주소가 비어 있습니다.');
+      if (!merged.username || !merged.password) throw new Error('아이디와 비밀번호를 입력하세요.');
+
       emit('log', { msg: '로그인 중…' });
-      await doLogin(page, { ...cfg.login, ...login });
-      emit('log', { msg: '로그인 성공 — 인증된 세션으로 검사합니다.' });
+      await doLogin(page, merged);
+      emit('log', { msg: '로그인에 성공했습니다.' });
     }
 
     emit('log', { msg: `${url} 접속 중…` });
