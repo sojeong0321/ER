@@ -1,0 +1,7 @@
+node_modules
+reports
+report
+.git
+.gitignore
+*.md
+!README.md
