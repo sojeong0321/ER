@@ -169,15 +169,18 @@
   .runhead .right{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ink-500)}
   .ptrack{height:3px;background:var(--ink-100);border-radius:99px;margin-top:11px;overflow:hidden}
   .pfill{height:100%;background:var(--brand);width:0;transition:width .3s ease;border-radius:99px}
-  .rungrid{display:grid;grid-template-columns:200px minmax(0,1fr);gap:22px;margin-top:20px}
-  @media(max-width:860px){.rungrid{grid-template-columns:1fr}}
-  .livelist{margin-top:14px}
-  .liverow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;color:var(--ink-600)}
-  .liverow .n{font-family:var(--mono);font-weight:600;color:var(--ink-900)}
-  .liverow.ok .n{color:var(--ok)} .liverow.nr .n{color:var(--nr)} .liverow.er .n{color:var(--er)}
+  .heathead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:22px 0 10px}
+  .livetally{margin-left:auto;display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-500)}
+  .lt{display:inline-flex;align-items:center;gap:6px}
+  .lt i{width:7px;height:7px;border-radius:50%;background:var(--ink-300)}
+  .lt b{font-family:var(--mono);font-weight:600;color:var(--ink-900)}
+  .lt.ok i{background:var(--ok)} .lt.ok b{color:var(--ok)}
+  .lt.nr i{background:var(--nr)} .lt.nr b{color:var(--nr)}
+  .lt.er i{background:var(--er)} .lt.er b{color:var(--er)}
 
   /* 터미널 로그 */
-  .term{background:var(--ink-950);border-radius:10px;padding:14px 16px;height:330px;overflow-y:auto;
+  #liveStrip{grid-template-columns:repeat(auto-fill,minmax(10px,18px))}
+  .term{background:var(--ink-950);border-radius:10px;padding:14px 16px;height:300px;overflow-y:auto;
     font-family:var(--mono);font-size:12px;line-height:1.9}
   .term .ln{display:flex;gap:10px;white-space:pre-wrap;word-break:break-all}
   .term .ts{color:#6b6b7b;flex-shrink:0}
@@ -507,22 +510,19 @@
               </div>
               <div class="ptrack"><div class="pfill" id="pfill"></div></div>
 
-              <div class="rungrid">
-                <div>
-                  <div class="eyebrow">라이브 히트맵</div>
-                  <div class="striptrack" id="liveStrip" style="margin-top:10px"></div>
-                  <div class="livelist">
-                    <div class="liverow ok"><span>정상</span><span class="n" id="liveOk">0</span></div>
-                    <div class="liverow nr"><span>무감</span><span class="n" id="liveNr">0</span></div>
-                    <div class="liverow er"><span>에러</span><span class="n" id="liveEr">0</span></div>
-                    <div class="liverow"><span>검사 제외</span><span class="n" id="liveRest">0</span></div>
-                  </div>
-                </div>
-                <div>
-                  <div class="eyebrow" style="margin-bottom:10px">로그 스트림</div>
-                  <div class="term" id="term"></div>
+              <div class="eyebrow" style="margin:20px 0 10px">로그 스트림</div>
+              <div class="term" id="term"></div>
+
+              <div class="heathead">
+                <span class="eyebrow">라이브 히트맵</span>
+                <div class="livetally">
+                  <span class="lt ok"><i></i>정상 <b id="liveOk">0</b></span>
+                  <span class="lt nr"><i></i>무감 <b id="liveNr">0</b></span>
+                  <span class="lt er"><i></i>에러 <b id="liveEr">0</b></span>
+                  <span class="lt ex"><i></i>검사 제외 <b id="liveRest">0</b></span>
                 </div>
               </div>
+              <div class="striptrack" id="liveStrip"></div>
             </div>
           </section>
 

@@ -302,9 +302,20 @@ async function scanPage(page, pageUrl, opts = {}) {
       const onFailed = req => {
         if (!clickedAt || failedOwn) return;
         if (NOISE_REQUEST.test(req.url())) return;
+
+        // 링크를 클릭하면 브라우저가 그 페이지로 이동을 시작한다. 관찰이 끝나고 우리가
+        // 원래 페이지로 되돌리면 진행 중이던 요청이 "취소" 된다. 사이트의 결함이 아니라
+        // 검사 방식이 만들어낸 실패이므로 세지 않는다.
+        const why = req.failure()?.errorText || '';
+        if (/ERR_ABORTED|ERR_CANCELED|interrupted|net::ERR_BLOCKED_BY_CLIENT/i.test(why)) return;
+
+        // 페이지 이동 자체의 실패도 여기서 다루지 않는다. 이동이 됐는지는 URL 신호로,
+        // 이동한 페이지가 멀쩡한지는 그 페이지에 들어갈 때 따로 확인한다.
+        if (req.isNavigationRequest()) return;
+
         // 대상 사이트 자신에 대한 요청 실패만 결함 후보로 본다
         const h = (() => { try { return new URL(req.url()).hostname; } catch { return ''; } })();
-        if (h && startSite && siteOf(h) === startSite) failedOwn = req.url();
+        if (h && startSite && siteOf(h) === startSite) failedOwn = { url: req.url(), why };
       };
       const onConsole = msg => {
         if (!clickedAt || jsError || msg.type() !== 'error') return;
@@ -385,7 +396,8 @@ async function scanPage(page, pageUrl, opts = {}) {
       } else if (badStatus) {
         status = 'ERROR'; reason = `HTTP ${badStatus.status} — ${shortUrl(badStatus.url)}`;
       } else if (failedOwn) {
-        status = 'ERROR'; reason = `요청 실패 — ${shortUrl(failedOwn)}`;
+        status = 'ERROR';
+        reason = `요청 실패 — ${shortUrl(failedOwn.url)}${failedOwn.why ? ` (${failedOwn.why.replace(/^net::/, '')})` : ''}`;
       } else if (!signals.dom && !signals.net && !signals.url && !signals.vis && !signals.scroll && !signals.popup) {
         status = 'NO-RESPONSE'; reason = `클릭 후 ${(observedMs / 1000).toFixed(1)}초 동안 무변화`;
       } else {
@@ -407,8 +419,14 @@ async function scanPage(page, pageUrl, opts = {}) {
       // ── 페이지를 벗어났으면 원위치 복귀 후 마커 재부여 ──
       if (urlChanged) {
         if (shouldStop()) break;
-        const back = await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
-          .then(() => true).catch(() => false);
+        // 뒤로가기가 먼저다. 주소를 다시 불러오는 것보다 빠르고, 진행 중이던 이동을
+        // 덜 끊어 먹는다. 히스토리가 없거나 엉뚱한 곳으로 가면 주소로 다시 연다.
+        let back = await page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 })
+          .then(() => page.url().split('#')[0] === pageUrl.split('#')[0]).catch(() => false);
+        if (!back) {
+          back = await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
+            .then(() => true).catch(() => false);
+        }
         if (!back) break;                     // 복귀 실패하면 이 페이지 검사 종료
         await stampElements(page, CLICKABLE);
       }

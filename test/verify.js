@@ -29,6 +29,7 @@ const EXPECT = {
   'lnk-anchor': 'PASS',           // 앵커 스크롤 — 스크롤을 신호로 안 보면 무감으로 오판한다
   'lnk-js-live': 'PASS',          // javascript: 링크에 동작이 연결된 경우
   'lnk-js-dead': 'NO-RESPONSE',   // javascript: 링크인데 아무 동작도 없는 경우
+  'lnk-nav': 'PASS',              // 내부 링크 이동 — 복귀하며 취소된 요청을 결함으로 세면 안 된다
   'btn-modal': 'PASS',            // 모달 표시 — 화면 변화
   'btn-popup': 'PASS',            // 새 창 열림 — 결제창처럼 창이 뜨는 것 말고는 반응이 없는 경우
   'btn-modal-close': 'PASS',      // 모달 닫기

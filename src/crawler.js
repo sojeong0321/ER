@@ -89,7 +89,15 @@ async function crawl(browser, startUrl, scope, onProgress, opts = {}) {
         continue;
       }
     } catch (e) {
-      const msg = String(e?.message || e).split('\n')[0].slice(0, 120);
+      const msg = String(e?.message || e).split('\n')[0].slice(0, 160);
+
+      // 다른 이동이 끼어들어 중단된 진입은 검사 방식이 만든 것이지 사이트의 결함이 아니다.
+      // 해당 주소는 다음 차례에 다시 시도된다.
+      if (/interrupted by another navigation|ERR_ABORTED/i.test(msg)) {
+        report('pageError', { url, msg: '다른 이동이 끼어들어 건너뜀' });
+        continue;
+      }
+
       report('pageError', { url, msg });
       allResults.push({
         page: url, label: '(페이지 진입)', sel: url, status: 'ERROR',

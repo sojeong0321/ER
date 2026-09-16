@@ -64,6 +64,12 @@
   <a class="btn" id="lnk-js-live" href="javascript:void(0)" onclick="out('javascript 링크 동작')">javascript 링크 (동작 있음)</a>
   <!-- javascript: 링크인데 아무 동작도 없는 경우 — 무감으로 잡혀야 한다 -->
   <a class="btn" id="lnk-js-dead" href="javascript:void(0)">javascript 링크 (동작 없음)</a>
+  <!--
+    같은 사이트의 다른 주소로 가는 링크.
+    클릭하면 이동이 시작되고, 관찰이 끝나 원래 페이지로 되돌리는 순간 그 이동이 취소된다.
+    그 취소를 결함으로 세면 링크가 많은 사이트가 통째로 에러가 된다.
+  -->
+  <a class="btn" id="lnk-nav" href="/test-target.html?moved=1">다른 주소로 이동 (내부 링크)</a>
 </div>
 
 <div class="grp">
