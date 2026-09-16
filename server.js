@@ -80,6 +80,16 @@ app.get('/api/report/:scanId', (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
+/** 같은 사내망의 동료에게 알려줄 접속 주소 — 화면에 그대로 띄운다 */
+app.get('/api/info', (req, res) => {
+  const port = server.address()?.port || PORT;
+  res.json({
+    port,
+    addresses: lanAddresses().map(ip => `http://${ip}:${port}`),
+    hostname: `http://${os.hostname().replace(/\.local$/, '')}.local:${port}`,
+  });
+});
+
 /** 회귀 테스트용 대상 페이지 */
 app.get('/test-target.html', (req, res) => res.sendFile(path.join(__dirname, 'test-target.html')));
 

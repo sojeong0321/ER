@@ -3,7 +3,14 @@
   "maxPages": 50,
   "scope": "path",
   "ignoreHTTPSErrors": true,
-  "excludeRules": ["삭제", "탈퇴", "결제", "로그아웃", "취소", "초기화"],
+  "excludeRules": [
+    "삭제",
+    "탈퇴",
+    "결제",
+    "로그아웃",
+    "구매",
+    "주문"
+  ],
   "login": {
     "enabled": false,
     "url": "",
