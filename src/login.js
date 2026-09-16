@@ -225,7 +225,7 @@ async function waitLoggedIn(page, successIndicator, timeoutMs = 15000) {
  * 반영해 버튼을 활성화하기까지는 잠깐 걸리므로, 채우자마자 누르면 비활성 버튼을 누르게 된다.
  * 버튼이 풀릴 때까지 기다렸다가 누르고, 그래도 못 누르면 조용히 넘기지 않고 알린다.
  */
-async function submitLogin(page, submitSelector, fallbackField, { required = true } = {}) {
+async function submitLogin(page, submitSelector, fallbackField, { required = true, log } = {}) {
   const submit = await firstVisible(page, [
     submitSelector,
     "button[type='submit']", "input[type='submit']",
@@ -233,6 +233,7 @@ async function submitLogin(page, submitSelector, fallbackField, { required = tru
   ]);
 
   if (!submit) {
+    log?.('로그인 버튼을 찾지 못해 Enter 로 제출합니다');
     if (fallbackField) await fallbackField.press('Enter').catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
     return;
@@ -240,6 +241,7 @@ async function submitLogin(page, submitSelector, fallbackField, { required = tru
 
   // 버튼이 풀릴 때까지 기다린다
   const enabled = await submit.isEnabled().catch(() => true);
+  log?.(enabled ? '로그인 버튼이 눌리는 상태입니다' : '로그인 버튼이 잠겨 있어 풀릴 때까지 기다립니다');
   if (!enabled) {
     await page.waitForFunction(() => {
       const b = [...document.querySelectorAll("button, input[type='submit']")]
@@ -256,8 +258,9 @@ async function submitLogin(page, submitSelector, fallbackField, { required = tru
       '버튼이 풀리는 화면일 수 있습니다. OTP 칸에 넣을 값을 지정했는지 확인하세요.');
   }
 
+  log?.('로그인 버튼을 누릅니다');
   await submit.click({ timeout: 8000 }).catch(async () => {
-    // 버튼을 눌렀는데도 반응이 없으면 Enter 로 한 번 더 시도한다
+    log?.('버튼 클릭이 되지 않아 Enter 로 다시 시도합니다');
     await fallbackField?.press('Enter').catch(() => {});
   });
   await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
@@ -276,8 +279,10 @@ async function doLogin(page, cfg) {
   const log = cfg.onLog;
   if (!url) throw new Error('로그인 주소가 비어 있습니다.');
 
+  log?.(`로그인 화면 여는 중 — ${url}`);
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
   await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
+  log?.(`로그인 화면 도착 — ${page.url()}`);
 
   const pw = await firstVisible(page, [cfg.passwordSelector, "input[type='password']"]);
   if (!pw) throw new Error('로그인 화면에서 비밀번호 입력칸을 찾지 못했습니다. 로그인 주소가 맞는지 확인하세요.');
@@ -306,6 +311,7 @@ async function doLogin(page, cfg) {
   await page.fill(userSel, username);
   await pw.fill(password);
   await page.waitForTimeout(150);   // 화면이 입력을 반영할 틈
+  log?.(`아이디 "${username}" 와 비밀번호를 입력했습니다`);
 
   // 같은 화면에 OTP 칸이 함께 있는 경우 (아이디·비밀번호·OTP 한 번에 입력하는 방식)
   try {
@@ -315,8 +321,9 @@ async function doLogin(page, cfg) {
     throw e;
   }
 
-  await submitLogin(page, submitSelector, pw);
+  await submitLogin(page, submitSelector, pw, { log });
   await page.waitForTimeout(600);   // 제출 직후에는 아직 화면이 그대로일 수 있다
+  log?.(`제출 후 주소 — ${page.url()}`);
 
   // 제출 후 OTP 칸이 나타나는 경우 (2단계로 나뉜 방식)
   try {
@@ -331,6 +338,11 @@ async function doLogin(page, cfg) {
   // 성공 확인 — 제출 결과가 화면에 반영될 때까지 지켜본다
   const done = await waitLoggedIn(page, successIndicator);
   if (!done.ok) {
+    if (cfg.shotDir) {
+      const file = require('path').join(cfg.shotDir, 'login-failed.png');
+      await page.screenshot({ path: file, timeout: 5000 }).catch(() => {});
+      log?.('로그인 실패 시점 화면을 저장했습니다 (리포트 폴더의 shots/login-failed.png)');
+    }
     if (done.message) throw new Error(`로그인에 실패했습니다: ${done.message}`);
     throw new Error(otpValue
       ? '로그인에 실패했습니다. 아이디·비밀번호와 OTP 값을 확인하세요.'

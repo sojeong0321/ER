@@ -50,6 +50,29 @@ const MIN_OBSERVE_MS = 400;     // 최소 관찰 시간 (즉시 반응도 놓치
 /* ────────────────────────── 브라우저 측 계측 ────────────────────────── */
 
 /**
+ * 화면이 다 그려질 때까지 기다린다.
+ *
+ * 요즘 화면은 주소를 열어도 곧바로 내용이 없다. 메뉴와 목록을 나중에 그리므로
+ * 그 전에 요소를 세면 한두 개밖에 잡히지 않는다. 클릭할 수 있는 요소 수가
+ * 더 늘지 않을 때까지 지켜본다.
+ */
+async function waitForContent(page, maxMs = 6000) {
+  const t0 = Date.now();
+  let prev = -1, stable = 0;
+  while (Date.now() - t0 < maxMs) {
+    const n = await page.$$eval(CLICKABLE, els => els.length).catch(() => 0);
+    if (n > 0 && n === prev) {
+      if (++stable >= 2) return n;      // 두 번 연속 그대로면 다 그려진 것으로 본다
+    } else {
+      stable = 0;
+    }
+    prev = n;
+    await page.waitForTimeout(350);
+  }
+  return prev;
+}
+
+/**
  * 검사 대상 요소에 data-er-i 인덱스를 부여한다.
  * 클릭 때마다 $$()[i] 로 다시 집으면 DOM이 바뀔 때 엉뚱한 요소를 클릭하게 되므로,
  * 매 요소 검사 전에 이 마커를 다시 찍어 같은 요소를 가리키도록 고정한다.
@@ -218,8 +241,14 @@ async function scanPage(page, pageUrl, opts = {}) {
     for (let i = 0; i < total; i++) {
       if (shouldStop()) break;
 
-      const locator = page.locator(`[data-er-i="${i}"]`).first();
-      if (!(await locator.count().catch(() => 0))) continue;
+      let locator = page.locator(`[data-er-i="${i}"]`).first();
+      if (!(await locator.count().catch(() => 0))) {
+        // 화면이 아직 그려지는 중일 수 있다. 한 번 더 기다린 뒤 다시 찾는다.
+        await waitForContent(page, 3000);
+        await stampElements(page, CLICKABLE);
+        locator = page.locator(`[data-er-i="${i}"]`).first();
+        if (!(await locator.count().catch(() => 0))) continue;
+      }
 
       // ── 요소 메타 수집 ──
       const info = await locator.evaluate(n => ({
@@ -429,6 +458,10 @@ async function scanPage(page, pageUrl, opts = {}) {
             .then(() => true).catch(() => false);
         }
         if (!back) break;                     // 복귀 실패하면 이 페이지 검사 종료
+
+        // 되돌아왔다고 바로 요소가 있는 것은 아니다. 화면이 다시 그려질 때까지 기다리지 않으면
+        // 남은 요소를 못 찾아 나머지를 통째로 건너뛰게 된다.
+        await waitForContent(page);
         await stampElements(page, CLICKABLE);
       }
     }
@@ -459,4 +492,4 @@ function describe(s) {
   return hit.join(' + ') + ' 변화 감지';
 }
 
-module.exports = { scanPage, CLICKABLE, siteOf };
+module.exports = { scanPage, CLICKABLE, siteOf, waitForContent };

@@ -2,7 +2,7 @@
  * 페이지 순회 크롤러
  * scope: 'page'(시작 URL만) | 'path'(시작 경로 하위) | 'domain'(같은 도메인 전체)
  */
-const { scanPage } = require('./engine');
+const { scanPage, CLICKABLE, waitForContent } = require('./engine');
 const cfg = require('../config.json');
 const { explainNavigation } = require('./explain');
 
@@ -89,6 +89,11 @@ async function crawl(browser, startUrl, scope, onProgress, opts = {}) {
         });
         continue;
       }
+
+      // 화면이 다 그려질 때까지 기다린다. 요즘 화면은 주소를 열어도 곧바로 내용이 없어서,
+      // 이 대기가 없으면 메뉴가 그려지기 전에 요소를 세어 한두 개만 잡힌다.
+      const ready = await waitForContent(page);
+      report('ready', { url, count: ready });
     } catch (e) {
       const raw = String(e?.message || e);
       const msg = explainNavigation(raw);

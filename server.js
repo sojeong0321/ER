@@ -530,7 +530,15 @@ async function runScan(scanId, options) {
         password: login?.password || saved.password,
         otp: login?.otp || saved.otp,
         onLog: msg => emit('log', { msg }),
+        shotDir: ensureDir(path.join(__dirname, 'reports', scanId, 'shots')),
       };
+
+      // 어떤 값으로 로그인하는지 밝힌다. 비밀번호는 남기지 않는다.
+      emit('log', {
+        msg: `로그인 설정 — 주소 ${merged.url} · 아이디 ${merged.username} · ` +
+             `비밀번호 ${merged.password ? '입력됨' : '없음'} · OTP ${merged.otp ? '입력됨' : '없음'}` +
+             (login?.password ? '' : ' (저장된 값 사용)'),
+      });
       if (!merged.url) throw new Error('로그인 주소가 비어 있습니다.');
       if (!merged.username || !merged.password) throw new Error('아이디와 비밀번호를 입력하세요.');
 
@@ -549,6 +557,7 @@ async function runScan(scanId, options) {
         status: ev.result.status, label: ev.result.label, sel: ev.result.sel, reason: ev.result.reason,
       });
       if (ev.type === 'done') emit('pageResult', { url: ev.url, count: ev.count });
+      if (ev.type === 'ready') emit('log', { msg: `화면이 준비됐습니다 — 클릭할 수 있는 요소 ${ev.count}개` });
       if (ev.type === 'pageError') emit('log', { msg: `접근 실패: ${ev.url} — ${ev.msg}` });
       if (ev.type === 'limit') emit('log', { msg: `최대 페이지 수(${ev.max}) 도달 — ${ev.skipped}개 페이지를 건너뜁니다.` });
       if (ev.type === 'stopped') emit('log', { msg: '사용자 요청으로 중단했습니다.' });
