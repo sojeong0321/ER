@@ -606,7 +606,32 @@ function lanAddresses() {
 }
 
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '0.0.0.0';   // 0.0.0.0 이어야 다른 PC에서 접속된다
+const HOST = process.env.HOST || '0.0.0.0';   // 0.0.0.0 이어야 다른 컴퓨터에서 접속된다
+
+/**
+ * 포트가 이미 쓰이고 있을 때 기본 오류는 스택 트레이스만 길게 쏟아낸다.
+ * 대부분 ER 서버가 이미 떠 있는 경우이므로, 무엇을 하면 되는지 알려준다.
+ */
+server.on('error', err => {
+  if (err.code !== 'EADDRINUSE') throw err;
+  console.error(`
+  ${PORT}번 포트를 이미 다른 프로그램이 쓰고 있습니다.
+  대개 ER 서버가 이미 실행 중인 경우입니다. 아래 중 하나를 하세요.
+
+    1. 이미 떠 있는 서버를 그대로 쓰기
+       브라우저에서  http://localhost:${PORT}  를 열어보세요.
+
+    2. 기존 서버를 끄고 다시 시작하기
+       그 서버가 떠 있는 터미널에서 Ctrl + C 를 누르거나, 아래를 실행하세요.
+
+         lsof -ti tcp:${PORT} | xargs kill
+
+    3. 다른 포트로 시작하기
+
+         PORT=4000 npm start
+`);
+  process.exit(1);
+});
 server.listen(PORT, HOST, () => {
   const hostname = os.hostname().replace(/\.local$/, '');
   console.log('');

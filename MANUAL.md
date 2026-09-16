@@ -386,10 +386,23 @@ OTP 칸에 넣을 값을 지정하지 않았습니다. 위 7번을 보세요.
 npx playwright install chromium
 ```
 
-**포트가 이미 사용 중이라고 나옴**
+**`EADDRINUSE: address already in use` 라고 나옴**
+
+3000번 포트를 이미 다른 프로그램이 쓰고 있다는 뜻입니다. 대개 **ER 서버가 이미 떠 있는** 경우예요.
+
 ```bash
+# 이미 떠 있는 서버를 그대로 쓰기
+open http://localhost:3000
+
+# 기존 서버를 정리하고 다시 시작하기
+lsof -ti tcp:3000 | xargs kill
+npm start
+
+# 다른 포트로 시작하기
 PORT=4000 npm start
 ```
+
+ER은 이 상황에서 위 방법들을 안내해줍니다.
 
 **검사가 너무 오래 걸림**
 `이 페이지만` 으로 범위를 좁히거나, 최대 페이지 수를 줄이세요. 관찰 시간을 1000ms로 낮추는 것도 방법입니다.
