@@ -108,6 +108,19 @@ async function crawl(browser, startUrl, scope, onProgress, opts = {}) {
       continue;
     }
 
+    // 로그인이 필요한 화면인데 로그인 상태가 아니면, 검사해 봐야 로그인 화면만 보게 된다.
+    // 첫 페이지에서 이를 알아채 알려준다.
+    if (visited.size === 1) {
+      const looksLoggedOut = await page.evaluate(() => {
+        const pw = [...document.querySelectorAll("input[type='password']")].some(e => e.offsetWidth || e.offsetHeight);
+        const few = document.querySelectorAll('button, a, [role=button], [onclick]').length <= 6;
+        return pw && few;
+      }).catch(() => false);
+      if (looksLoggedOut) {
+        report('loggedOut', { url });
+      }
+    }
+
     const pageResults = await scanPage(page, url, {
       ...opts,
       onElement: p => report('element', { url, ...p }),

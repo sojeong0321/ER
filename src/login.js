@@ -301,6 +301,20 @@ async function doLogin(page, cfg) {
       ? '로그인에 실패했습니다. 아이디·비밀번호와 OTP 값을 확인하세요.'
       : '로그인에 실패했습니다. 아이디·비밀번호를 확인하세요.');
   }
+
+  // 화면이 바뀌었다고 로그인이 끝난 것은 아니다. 요즘 화면은 로그인 응답을 받은 뒤
+  // 토큰을 브라우저에 저장하는데, 그 전에 다음 주소로 넘어가면 로그인이 풀린 것으로 처리된다.
+  // 저장이 끝날 틈을 주고, 실제로 무언가 저장됐는지 확인한다.
+  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(1200);
+
+  const kept = await page.evaluate(() => {
+    const ls = (() => { try { return Object.keys(localStorage).length; } catch { return 0; } })();
+    const ss = (() => { try { return Object.keys(sessionStorage).length; } catch { return 0; } })();
+    return { ls, ss, cookie: document.cookie.length };
+  }).catch(() => ({ ls: 0, ss: 0, cookie: 0 }));
+
+  log?.(`로그인 상태 확인 — 쿠키 ${kept.cookie ? '있음' : '없음'} · 저장소 항목 ${kept.ls + kept.ss}개`);
 }
 
 function otpGuide() {

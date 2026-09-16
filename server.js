@@ -552,6 +552,11 @@ async function runScan(scanId, options) {
       if (ev.type === 'pageError') emit('log', { msg: `접근 실패: ${ev.url} — ${ev.msg}` });
       if (ev.type === 'limit') emit('log', { msg: `최대 페이지 수(${ev.max}) 도달 — ${ev.skipped}개 페이지를 건너뜁니다.` });
       if (ev.type === 'stopped') emit('log', { msg: '사용자 요청으로 중단했습니다.' });
+      if (ev.type === 'loggedOut') emit('log', {
+        msg: '로그인 화면이 보입니다 — 로그인되지 않은 상태로 검사 중입니다. ' +
+             '이대로 두면 로그인 화면의 요소만 검사됩니다. ' +
+             '로그인 설정을 켰는지, 세션이 만료되지 않았는지 확인하세요.',
+      });
     }, {
       observeMs,
       excludeRules,
