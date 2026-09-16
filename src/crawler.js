@@ -77,6 +77,7 @@ async function crawl(browser, startUrl, scope, onProgress, opts = {}) {
 
     try {
       const resp = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      if (shouldStop()) { report('stopped', {}); break; }
       // 이후 렌더링까지 잠깐 기다린다 (SPA 대응). 끝나지 않아도 계속 진행한다.
       await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
       if (resp && resp.status() >= 400) {
@@ -100,6 +101,10 @@ async function crawl(browser, startUrl, scope, onProgress, opts = {}) {
     const pageResults = await scanPage(page, url, {
       ...opts,
       onElement: p => report('element', { url, ...p }),
+    }).catch(e => {
+      // 중단 중이라면 여기까지 모은 결과로 끝낸다
+      if (shouldStop()) return [];
+      throw e;
     });
     allResults.push(...pageResults);
     report('done', { url, count: pageResults.length });

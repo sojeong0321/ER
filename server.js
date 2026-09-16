@@ -90,9 +90,18 @@ app.post('/api/scan', (req, res) => {
 
 app.post('/api/scan/:scanId/stop', (req, res) => {
   const scan = scans.get(req.params.scanId);
-  if (!scan) return res.status(404).json({ error: '스캔을 찾을 수 없습니다.' });
+  if (!scan) return res.status(404).json({ error: '검사를 찾을 수 없습니다.' });
   scan.stop = true;
   res.json({ ok: true });
+
+  // 페이지 이동을 기다리는 중이면 깃발만으로는 즉시 멈추지 않는다.
+  // 잠시 기다려 보고도 끝나지 않으면 브라우저를 닫아 대기를 끊는다.
+  // 그때까지 모은 결과는 그대로 살아남는다.
+  setTimeout(() => {
+    if (scan.status === 'running' && scan.browser) {
+      scan.browser.close().catch(() => {});
+    }
+  }, 2500);
 });
 
 app.get('/api/report/:scanId', (req, res) => {
@@ -468,6 +477,8 @@ async function runScan(scanId, options) {
       emit('log', { msg: `저장된 로그인으로 검사합니다 (${new Date(saved.savedAt).toLocaleString('ko-KR')} 저장).` });
     }
 
+    scan.browser = browser;
+
     const context = await browser.newContext({
       ignoreHTTPSErrors: cfg.ignoreHTTPSErrors !== false,
       acceptDownloads: false,
@@ -521,6 +532,7 @@ async function runScan(scanId, options) {
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     await browser.close().catch(() => {});
     browser = null;
+    scan.browser = null;
 
     const meta = {
       url, scope, elapsed,
@@ -540,11 +552,19 @@ async function runScan(scanId, options) {
 
   } catch (e) {
     const msg = String(e?.message || e);
-    console.error('스캔 오류:', msg);
-    Object.assign(scan, { status: 'error', message: msg });
-    emit('scanError', { msg });
+    if (scan.stop) {
+      // 중단 요청으로 브라우저를 닫아 생긴 예외다. 오류로 알릴 일이 아니다.
+      emit('log', { msg: '중단했습니다.' });
+      Object.assign(scan, { status: 'done', results: scan.results || [], meta: scan.meta || { url, scope, elapsed: '0', scannedAt: new Date().toLocaleString('ko-KR'), stopped: true, scanId } });
+      emit('done', { results: scan.results || [], meta: scan.meta, scanId });
+    } else {
+      console.error('검사 오류:', msg);
+      Object.assign(scan, { status: 'error', message: msg });
+      emit('scanError', { msg });
+    }
   } finally {
     if (browser) await browser.close().catch(() => {});
+    scan.browser = null;
   }
 }
 

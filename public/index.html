@@ -1021,6 +1021,7 @@ async function startScan() {
   $('goBtn').disabled = true;
   $('stopBtn').hidden = false;
   $('stopBtn').disabled = false;
+  $('stopBtn').textContent = '중단';
   startedAt = Date.now();
   clearInterval(tick);
   tick = setInterval(() => {
@@ -1075,7 +1076,8 @@ async function startScan() {
 async function stopScan() {
   if (!scanId) return;
   $('stopBtn').disabled = true;
-  term('WARN', '중단 요청 — 진행 중인 요소까지만 마칩니다');
+  $('stopBtn').textContent = '중단하는 중…';
+  term('WARN', '중단 요청 — 잠시 뒤 멈춥니다. 그때까지 검사한 결과는 그대로 남습니다.');
   await fetch(`/api/scan/${scanId}/stop`, { method: 'POST' }).catch(() => {});
 }
 

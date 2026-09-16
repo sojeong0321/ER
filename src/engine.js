@@ -337,6 +337,7 @@ async function scanPage(page, pageUrl, opts = {}) {
       let mut = null, navigated = false;
       const t0 = Date.now();
       while (true) {
+        if (shouldStop()) break;
         const waited = Date.now() - t0;
         if (waited >= OBSERVE_MS) break;
         await page.waitForTimeout(POLL_MS).catch(() => {});
@@ -405,14 +406,19 @@ async function scanPage(page, pageUrl, opts = {}) {
 
       // ── 페이지를 벗어났으면 원위치 복귀 후 마커 재부여 ──
       if (urlChanged) {
+        if (shouldStop()) break;
         const back = await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
           .then(() => true).catch(() => false);
         if (!back) break;                     // 복귀 실패하면 이 페이지 검사 종료
         await stampElements(page, CLICKABLE);
       }
     }
+  } catch (e) {
+    // 중단 요청으로 브라우저가 닫히면 진행 중이던 작업이 예외를 낸다.
+    // 그때까지 모은 결과는 그대로 쓸 수 있으므로 조용히 넘긴다.
+    if (!shouldStop()) throw e;
   } finally {
-    ctx.off('page', onPopup);
+    try { ctx.off('page', onPopup); } catch {}
   }
 
   return results;
