@@ -17,7 +17,24 @@ const { doLogin, readSession, saveSession, clearSession } = login_;
 const totp = require('./src/totp');
 const { crawl } = require('./src/crawler');
 const { saveHtml, saveExcel, saveMarkdown, buildHtml, buildMarkdown } = require('./src/reporter');
-const cfg = require('./config.json');
+const baseCfg = require('./config.json');
+
+/**
+ * 설정은 두 겹이다.
+ *  - config.json        저장소에 들어가는 기본값
+ *  - config.local.json  이 PC 에서 바꾼 값 (git 에 올라가지 않는다)
+ * 화면에서 저장하면 아래쪽에만 쓰고, 읽을 때 위에 덮어 쓴다.
+ */
+const LOCAL_CFG = path.join(__dirname, 'config.local.json');
+
+function readLocalCfg() {
+  try { return JSON.parse(fs.readFileSync(LOCAL_CFG, 'utf8')); } catch { return {}; }
+}
+function currentCfg() {
+  const local = readLocalCfg();
+  return { ...baseCfg, ...local, login: { ...baseCfg.login, ...(local.login || {}) } };
+}
+let cfg = currentCfg();
 
 const app = express();
 const server = http.createServer(app);
@@ -85,6 +102,58 @@ app.get('/api/report/:scanId', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true, uptime: process.uptime() }));
+
+/* ── 기본 검사 규칙 ── */
+
+/** 화면에서 바꾼 기본값은 이 PC 에 저장되어, 사내망으로 접속한 동료에게도 같이 적용된다 */
+app.get('/api/settings', (req, res) => {
+  const c = currentCfg();
+  res.json({
+    observeMs: c.observeMs,
+    maxPages: c.maxPages,
+    scope: c.scope,
+    excludeRules: c.excludeRules || [],
+    clickNewTab: !!c.clickNewTab,
+    clickExternal: !!c.clickExternal,
+    ignoreHTTPSErrors: c.ignoreHTTPSErrors !== false,
+    changed: Object.keys(readLocalCfg()).length > 0,
+  });
+});
+
+app.put('/api/settings', (req, res) => {
+  const b = req.body || {};
+  const next = {};
+
+  const num = (v, min, max) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= min && n <= max ? n : null;
+  };
+  const observeMs = num(b.observeMs, 300, 60000);
+  const maxPages = num(b.maxPages, 1, 1000);
+  if (observeMs === null || maxPages === null) {
+    return res.status(400).json({ error: '관찰 시간은 300~60000ms, 최대 페이지는 1~1000 사이여야 합니다.' });
+  }
+  next.observeMs = observeMs;
+  next.maxPages = maxPages;
+  if (['page', 'path', 'domain'].includes(b.scope)) next.scope = b.scope;
+  if (Array.isArray(b.excludeRules)) {
+    next.excludeRules = [...new Set(b.excludeRules.map(x => String(x).trim()).filter(Boolean))].slice(0, 100);
+  }
+  next.clickNewTab = !!b.clickNewTab;
+  next.clickExternal = !!b.clickExternal;
+  next.ignoreHTTPSErrors = b.ignoreHTTPSErrors !== false;
+
+  fs.writeFileSync(LOCAL_CFG, JSON.stringify(next, null, 2), 'utf8');
+  cfg = currentCfg();
+  res.json({ ok: true });
+});
+
+/** 기본값으로 되돌린다 */
+app.delete('/api/settings', (req, res) => {
+  try { fs.unlinkSync(LOCAL_CFG); } catch {}
+  cfg = currentCfg();
+  res.json({ ok: true });
+});
 
 /** Runner 상태 — 어떤 브라우저로, 어떤 설정으로 도는지 화면에 밝힌다 */
 let browserVersion = null;

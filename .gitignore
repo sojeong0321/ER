@@ -1,9 +1,9 @@
+*.local.json
+*.xlsx
+.DS_Store
+auth.local.json
+config.local.json
+credentials.local.json
 node_modules/
 report/
 reports/
-*.xlsx
-*.local.json
-.DS_Store
-config.local.json
-auth.local.json
-credentials.local.json
