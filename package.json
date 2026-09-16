@@ -7,7 +7,8 @@
     "start": "node server.js",
     "scan": "node scan.js",
     "test": "node test/verify.js",
-    "postinstall": "playwright install chromium"
+    "postinstall": "playwright install chromium",
+    "login": "node login.js"
   },
   "engines": {
     "node": ">=20"

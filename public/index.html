@@ -66,6 +66,10 @@
   .fld.wide input{min-width:250px}
   .chk{display:flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer;padding-bottom:9px}
   .chk input{width:16px;height:16px;accent-color:var(--ink)}
+  .hint{font-size:12.5px;color:var(--ink3);line-height:1.6}
+  .hint code{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12px}
+  .note.warn{background:var(--nr-bg);border:1px solid var(--nr-line);color:#7d440a}
+  .note.warn b{display:block;margin-bottom:3px;color:var(--nr)}
   .loginrow{display:none;gap:10px;flex-wrap:wrap;width:100%}
   .loginrow.open{display:flex}
 
@@ -245,8 +249,10 @@
       <label class="fld"><span>요소당 관찰 시간</span><input id="observeMs" type="number" value="2000" min="300" step="100" style="width:110px"></label>
       <label class="fld"><span>최대 페이지 수</span><input id="maxPages" type="number" value="50" min="1" style="width:100px"></label>
       <label class="fld wide"><span>클릭하지 않을 단어</span><input id="excl" value="삭제, 탈퇴, 결제, 로그아웃, 구매, 주문" spellcheck="false"></label>
-      <label class="chk"><input type="checkbox" id="loginOn"> 로그인이 필요한 화면</label>
+      <label class="chk" id="sessionWrap" hidden><input type="checkbox" id="sessionOn"> 저장된 로그인 사용 <span id="sessionAt" class="hint"></span></label>
+      <label class="chk"><input type="checkbox" id="loginOn"> 아이디·비밀번호로 로그인</label>
       <div class="loginrow" id="loginRow">
+        <p class="hint" style="width:100%;margin:-2px 0 2px">OTP 같은 2단계 인증이 있는 화면은 이 방식으로 들어갈 수 없습니다. 터미널에서 <code>npm run login &lt;로그인 주소&gt;</code> 를 실행해 직접 한 번 로그인해두세요.</p>
         <label class="fld"><span>로그인 주소</span><input id="loginUrl" placeholder="https://.../login" style="min-width:230px"></label>
         <label class="fld"><span>아이디</span><input id="loginId" autocomplete="off" style="width:150px"></label>
         <label class="fld"><span>비밀번호</span><input id="loginPw" type="password" autocomplete="off" style="width:150px"></label>
@@ -375,7 +381,10 @@ $('moreBtn').addEventListener('click', () => {
   $('moreBtn').setAttribute('aria-expanded', String(open));
   $('moreBtn').textContent = open ? '세부 설정 접기' : '세부 설정';
 });
-$('loginOn').addEventListener('change', e => $('loginRow').classList.toggle('open', e.target.checked));
+$('loginOn').addEventListener('change', e => {
+  $('loginRow').classList.toggle('open', e.target.checked);
+  if (e.target.checked) $('sessionOn').checked = false;
+});
 $('url').addEventListener('keydown', e => { if (e.key === 'Enter') startScan(); });
 $('goBtn').addEventListener('click', startScan);
 $('stopBtn').addEventListener('click', stopScan);
@@ -407,10 +416,32 @@ fetch('/api/info').then(r => r.json()).then(info => {
   $('share').hidden = false;
 }).catch(() => {});
 
+/* ── 저장된 로그인 ── */
+fetch('/api/session').then(r => r.json()).then(info => {
+  if (!info.exists) return;
+  $('sessionWrap').hidden = false;
+  $('sessionOn').checked = true;
+  $('sessionAt').textContent = info.savedAt
+    ? `(${new Date(info.savedAt).toLocaleString('ko-KR')} 저장)` : '';
+}).catch(() => {});
+
+$('sessionOn').addEventListener('change', e => {
+  if (e.target.checked) { $('loginOn').checked = false; $('loginRow').classList.remove('open'); }
+});
+
 /* ── 스캔 ── */
 async function startScan() {
   const url = $('url').value.trim();
   if (!url) { toast('검사할 주소를 입력하세요'); $('url').focus(); return; }
+
+  const excludeRules = $('excl').value.split(',').map(s => s.trim()).filter(Boolean);
+  if (!excludeRules.length) {
+    const go = confirm(
+      '클릭하지 않을 단어가 비어 있습니다.\n\n' +
+      'ER은 버튼을 실제로 클릭합니다. 이 상태로 검사하면 삭제·발송·승인처럼 ' +
+      '되돌릴 수 없는 버튼도 눌립니다.\n\n그래도 검사를 시작할까요?');
+    if (!go) { $('adv').classList.add('open'); $('excl').focus(); return; }
+  }
 
   DATA = []; filter = 'ALL'; liveCount = 0;
   $('errNote').classList.remove('on');
@@ -425,6 +456,7 @@ async function startScan() {
   $('stopBtn').style.display = '';
   running = true;
 
+  const useSession = $('sessionOn').checked;
   const login = $('loginOn').checked ? {
     enabled: true,
     url: $('loginUrl').value.trim(),
@@ -436,8 +468,8 @@ async function startScan() {
     const res = await fetch('/api/scan', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        url, scope, login,
-        excludeRules: $('excl').value.split(',').map(s => s.trim()).filter(Boolean),
+        url, scope, login, useSession,
+        excludeRules,
         observeMs: Number($('observeMs').value) || 2000,
         maxPages: Number($('maxPages').value) || 50,
       }),

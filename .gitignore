@@ -5,3 +5,4 @@ reports/
 *.local.json
 .DS_Store
 config.local.json
+auth.local.json

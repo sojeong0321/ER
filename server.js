@@ -11,7 +11,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { Server } = require('socket.io');
 const { chromium } = require('playwright');
-const { doLogin } = require('./src/login');
+const { doLogin, readSession } = require('./src/login');
 const { crawl } = require('./src/crawler');
 const { saveHtml, saveExcel } = require('./src/reporter');
 const cfg = require('./config.json');
@@ -43,7 +43,7 @@ function emitter(scanId) {
 }
 
 app.post('/api/scan', (req, res) => {
-  const { url, scope, login, excludeRules, observeMs, maxPages } = req.body || {};
+  const { url, scope, login, excludeRules, observeMs, maxPages, useSession } = req.body || {};
   if (!url || !/^https?:\/\//i.test(String(url))) {
     return res.status(400).json({ error: 'http:// 또는 https:// 로 시작하는 URL을 입력하세요.' });
   }
@@ -59,6 +59,7 @@ app.post('/api/scan', (req, res) => {
     url: String(url).trim(),
     scope: scope || cfg.scope || 'path',
     login,
+    useSession: !!useSession,
     excludeRules,
     observeMs: Number(observeMs) || cfg.observeMs || 2000,
     maxPages: Number(maxPages) || cfg.maxPages || 50,
@@ -90,6 +91,12 @@ app.get('/api/info', (req, res) => {
   });
 });
 
+/** 저장된 로그인 세션이 있는지 알려준다 */
+app.get('/api/session', (req, res) => {
+  const s = readSession();
+  res.json(s ? { exists: true, savedAt: s.savedAt, url: s.url } : { exists: false });
+});
+
 /** 회귀 테스트용 대상 페이지 */
 app.get('/test-target.html', (req, res) => res.sendFile(path.join(__dirname, 'test-target.html')));
 
@@ -100,7 +107,7 @@ app.get('/api/_test/ok', (req, res) => res.json({ ok: true }));
 async function runScan(scanId, options) {
   const scan = scans.get(scanId);
   const emit = emitter(scanId);
-  const { url, scope, login, excludeRules, observeMs, maxPages } = options;
+  const { url, scope, login, useSession, excludeRules, observeMs, maxPages } = options;
   let browser = null;
 
   try {
@@ -113,14 +120,25 @@ async function runScan(scanId, options) {
       throw new Error(browserHint(e));
     }
 
+    let storageState;
+    if (useSession) {
+      const saved = readSession();
+      if (!saved) {
+        throw new Error('저장된 로그인이 없습니다. 터미널에서 "npm run login <로그인 주소>" 를 먼저 실행하세요.');
+      }
+      storageState = saved.state;
+      emit('log', { msg: `저장된 로그인으로 검사합니다 (${new Date(saved.savedAt).toLocaleString('ko-KR')} 저장).` });
+    }
+
     const context = await browser.newContext({
       ignoreHTTPSErrors: cfg.ignoreHTTPSErrors !== false,
       acceptDownloads: false,
       viewport: { width: 1440, height: 900 },
+      ...(storageState ? { storageState } : {}),
     });
     const page = await context.newPage();
 
-    if (login?.enabled && login?.username) {
+    if (!useSession && login?.enabled && login?.username) {
       emit('log', { msg: '로그인 중…' });
       await doLogin(page, { ...cfg.login, ...login });
       emit('log', { msg: '로그인 성공 — 인증된 세션으로 검사합니다.' });

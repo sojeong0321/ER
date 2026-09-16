@@ -13,7 +13,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
-const { doLogin } = require('./src/login');
+const { doLogin, readSession } = require('./src/login');
 const { crawl } = require('./src/crawler');
 const { saveHtml, saveExcel } = require('./src/reporter');
 const cfg = require('./config.json');
@@ -41,6 +41,7 @@ if (!targetUrl || has('--help') || has('-h')) {
     --max-pages <n>            최대 순회 페이지 수 (기본: ${cfg.maxPages})
     --exclude "삭제,결제"       제외 규칙 (기본: ${(cfg.excludeRules || []).join(',')})
     --login                    config.json 의 로그인 정보 사용
+    --session                  저장된 로그인 사용 (npm run login 으로 미리 저장)
     --out <dir>                리포트 저장 경로 (기본: ${cfg.outputDir})
     --quiet                    요약만 출력
 
@@ -58,6 +59,7 @@ const maxPages = parseInt(val('--max-pages', cfg.maxPages ?? 50), 10);
 const excludeRules = val('--exclude', (cfg.excludeRules || []).join(','))
   .split(',').map(s => s.trim()).filter(Boolean);
 const useLogin = has('--login') || cfg.login?.enabled === true;
+const useSession = has('--session');
 const outputDir = path.resolve(val('--out', cfg.outputDir ?? 'report'));
 const quiet = has('--quiet');
 
@@ -86,14 +88,27 @@ const color = (s, t) => `${C[s] || ''}${t}${C.reset}`;
     process.exit(1);
   }
 
+  let storageState;
+  if (useSession) {
+    const saved = readSession();
+    if (!saved) {
+      console.error('  저장된 로그인이 없습니다. 먼저 실행하세요:\n\n    npm run login <로그인 주소>\n');
+      await browser.close();
+      process.exit(1);
+    }
+    storageState = saved.state;
+    console.log(`  ${C.dim}저장된 로그인 사용 (${new Date(saved.savedAt).toLocaleString('ko-KR')} 저장)${C.reset}`);
+  }
+
   const context = await browser.newContext({
     ignoreHTTPSErrors: cfg.ignoreHTTPSErrors !== false,
     acceptDownloads: false,
     viewport: { width: 1440, height: 900 },
+    ...(storageState ? { storageState } : {}),
   });
   const page = await context.newPage();
 
-  if (useLogin && cfg.login?.username) {
+  if (!useSession && useLogin && cfg.login?.username) {
     try {
       await doLogin(page, cfg.login);
     } catch (e) {
