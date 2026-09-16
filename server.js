@@ -155,6 +155,16 @@ app.delete('/api/settings', (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * 화면에 창을 띄울 수 있는 환경인가.
+ * 서버(특히 컨테이너)에는 화면이 없어 "직접 로그인" 창을 띄워도 아무도 볼 수 없다.
+ * 그 경우 그 방법을 권하지 않아야 한다.
+ */
+function canOpenWindow() {
+  if (process.platform === 'darwin' || process.platform === 'win32') return true;
+  return !!(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
+}
+
 /** Runner 상태 — 어떤 브라우저로, 어떤 설정으로 도는지 화면에 밝힌다 */
 let browserVersion = null;
 app.get('/api/runner', async (req, res) => {
@@ -174,10 +184,12 @@ app.get('/api/runner', async (req, res) => {
     viewport: '1440×900',
     state: busy ? 'busy' : 'idle',
     peers: io.engine.clientsCount,
+    host: os.hostname().replace(/\.local$/, ''),
+    canOpenWindow: canOpenWindow(),
   });
 });
 
-/** 같은 사내망의 동료에게 알려줄 접속 주소 — 화면에 그대로 띄운다 */
+/** 같은 사내망에서 접속할 수 있는 주소 — 화면에 그대로 띄운다 */
 app.get('/api/info', (req, res) => {
   const port = server.address()?.port || PORT;
   res.json({
@@ -207,6 +219,13 @@ app.post('/api/session/open', async (req, res) => {
   const { url } = req.body || {};
   if (!url || !/^https?:\/\//i.test(String(url))) {
     return res.status(400).json({ error: 'http:// 또는 https:// 로 시작하는 로그인 주소를 입력하세요.' });
+  }
+  if (!canOpenWindow()) {
+    return res.status(400).json({
+      error: '이 서버에는 화면이 없어 로그인 창을 띄울 수 없습니다. ' +
+             '아이디·비밀번호 방식을 쓰거나, 화면이 있는 PC에서 ER 을 실행해 로그인 상태를 만든 뒤 ' +
+             'auth.local.json 을 서버로 옮기세요.',
+    });
   }
   if (loginSession) {
     try { await loginSession.browser.close(); } catch {}
@@ -573,10 +592,15 @@ server.listen(PORT, HOST, () => {
   console.log('');
   console.log('  ER — 자동 스모크 테스트 서버가 실행 중입니다.');
   console.log('');
-  console.log(`    내 PC에서      →  http://localhost:${PORT}`);
+  console.log(`    이 컴퓨터에서   →  http://localhost:${PORT}`);
   lanAddresses().forEach(ip => console.log(`    같은 사내망에서 →  http://${ip}:${PORT}`));
   console.log(`    이름으로       →  http://${hostname}.local:${PORT}   (윈도우에서는 안 될 수 있음)`);
   console.log('');
+  if (!canOpenWindow()) {
+    console.log('  * 이 환경에는 화면이 없어 "직접 로그인" 방식은 쓸 수 없습니다.');
+    console.log('    로그인이 필요한 화면은 아이디·비밀번호 방식을 쓰세요.');
+    console.log('');
+  }
   console.log('  종료하려면 Ctrl + C');
   console.log('');
 });

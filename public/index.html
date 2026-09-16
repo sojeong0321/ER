@@ -456,11 +456,11 @@
                       <label class="fld"><span>OTP <span class="opt">(있으면)</span></span><input id="loginOtp" autocomplete="off" placeholder="123123" style="width:140px"></label>
                     </div>
                     <div class="warnbox">
-                      <b>이 PC에 저장하면 접속한 다른 사람도 이 계정으로 검사를 돌릴 수 있습니다.</b><br>
+                      <b>서버에 저장하면 접속한 다른 사람도 이 계정으로 검사를 돌릴 수 있습니다.</b><br>
                       비밀번호와 OTP 값은 화면에 보이지 않지만 검사에는 그대로 쓰입니다. 운영 계정 말고 <b>검사 전용 계정</b>을 쓰세요.
                     </div>
                     <div class="credrow">
-                      <button type="button" class="openbtn sm" id="saveCredBtn">이 PC에 저장</button>
+                      <button type="button" class="openbtn sm" id="saveCredBtn">서버에 저장</button>
                       <button type="button" class="linkbtn" id="checkOtpBtn" title="OTP 칸에 실제로 어떤 값이 입력될지 미리 보여줍니다.">입력될 값 미리보기</button>
                       <button type="button" class="linkbtn" id="forgetCredBtn" hidden>저장된 계정 지우기</button>
                       <span class="hint" id="credState"></span>
@@ -479,8 +479,8 @@
                     <div class="credrow" id="loginForm">
                       <label class="fld"><span>로그인 주소</span><input id="sessionUrl" placeholder="https://example.co.kr/login" style="min-width:270px"></label>
                       <button type="button" class="openbtn" id="openLoginBtn">로그인 창 열기</button>
-                      <p class="hint" style="width:100%">로그인 창이 이 PC 화면에 뜹니다. 직접 로그인하세요. OTP·SSO 무엇이든 통과할 수 있습니다.<br>
-                        <b>로그인한 상태가 이 PC에 저장되어, 접속한 다른 사람도 그 상태로 검사를 돌릴 수 있습니다.</b></p>
+                      <p class="hint" style="width:100%" id="sessionHint">로그인 창이 <b>서버가 실행 중인 컴퓨터 화면</b>에 뜹니다. 직접 로그인하면 OTP·SSO 무엇이든 통과할 수 있습니다.<br>
+                        <b>로그인한 상태가 서버에 저장되어, 접속한 다른 사람도 그 상태로 검사를 돌릴 수 있습니다.</b></p>
                     </div>
                     <div class="loginwait" id="loginWait" hidden>
                       <span class="dot" style="background:var(--nr)"></span>
@@ -543,7 +543,7 @@
             <div class="hd">
               <div>
                 <h2>최근 검사</h2>
-                <div class="hint">최근 5회입니다. 전체 기록은 1년간 보관됩니다.</div>
+                <div class="hint">최근 5회입니다. 전체 기록은 서버에 1년간 보관됩니다.</div>
               </div>
               <div class="right"><button type="button" class="linkbtn" id="seeAllHist">모두 보기</button></div>
             </div>
@@ -560,7 +560,7 @@
             <div class="hd">
               <div>
                 <h2>규칙 · 세부 설정</h2>
-                <div class="hint">여기서 바꾼 값이 새 검사의 기본값이 됩니다. 이 PC에 저장되므로 사내망으로 접속한 동료에게도 같이 적용됩니다.</div>
+                <div class="hint">여기서 바꾼 값이 새 검사의 기본값이 됩니다. <b>서버에 저장되므로 접속한 모든 사람에게 같이 적용됩니다.</b></div>
               </div>
               <div class="right"><span class="hint" id="rulesState"></span></div>
             </div>
@@ -610,7 +610,7 @@
 
               <h3 style="font-size:13px;font-weight:650;margin-bottom:10px">저장된 로그인</h3>
               <div class="warnbox" style="margin-bottom:12px">
-                <b>저장된 로그인은 이 PC에 접속한 누구나 쓸 수 있습니다.</b><br>
+                <b>저장된 로그인은 이 서버에 접속한 누구나 쓸 수 있습니다.</b><br>
                 비밀번호·OTP 값이나 세션 쿠키가 화면에 보이지는 않지만, 검사를 실행하면 그 계정 권한으로 대상 화면의 버튼을 클릭합니다.
                 필요 없어지면 지워두세요.
               </div>
@@ -623,7 +623,7 @@
             <div class="hd">
               <div>
                 <h2>검사 이력</h2>
-                <div class="hint">이 서버가 실행 중인 PC에 <b>1년간</b> 보관합니다. 같은 사내망 동료도 같은 목록을 봅니다.</div>
+                <div class="hint">서버에 <b>1년간</b> 보관합니다. 접속한 모든 사람이 같은 목록을 봅니다.</div>
               </div>
               <div class="right"><span class="hint" id="histCount"></span></div>
             </div>
@@ -704,8 +704,8 @@
           </div>
 
           <div class="side-card" id="share" hidden>
-            <h3>같은 사내망 동료</h3>
-            <p class="hint">이 PC가 열 수 있는 주소는 모두 검사할 수 있습니다. 복사해서 공유하세요.</p>
+            <h3>접속 주소</h3>
+            <p class="hint">검사는 이 서버에서 실행됩니다. <b>서버가 열 수 있는 주소</b>는 모두 검사할 수 있습니다.<br>동료에게는 아래 주소를 알려주세요.</p>
             <div id="addrList"></div>
           </div>
 
@@ -906,8 +906,8 @@ $('saveCredBtn').addEventListener('click', async () => {
   };
   if (!body.url || !body.username) { toast('로그인 주소와 아이디를 입력하세요'); return; }
   if (!confirm(
-    '이 PC에 계정 정보를 저장합니다.\n\n' +
-    '사내망으로 접속한 다른 사람도 이 계정으로 검사를 실행할 수 있습니다. ' +
+    '서버에 계정 정보를 저장합니다.\n\n' +
+    '이 서버에 접속한 다른 사람도 이 계정으로 검사를 실행할 수 있습니다. ' +
     '비밀번호와 OTP 값 자체는 화면에 표시되지 않지만, 검사에는 그대로 쓰입니다.\n\n' +
     '운영 계정이 아닌 검사 전용 계정인지 확인하셨나요?')) return;
   try {
@@ -918,7 +918,7 @@ $('saveCredBtn').addEventListener('click', async () => {
     if (!res.ok) throw new Error(out.error);
     $('loginPw').value = ''; $('loginOtp').value = '';
     await loadCred();
-    toast('이 PC에 저장했습니다');
+    toast('서버에 저장했습니다');
   } catch (e) { toast(e.message || '저장하지 못했습니다'); }
 });
 
@@ -963,8 +963,8 @@ $('openLoginBtn').addEventListener('click', async () => {
 
 $('doneLoginBtn').addEventListener('click', async () => {
   if (!confirm(
-    '로그인한 상태를 이 PC에 저장합니다.\n\n' +
-    '사내망으로 접속한 다른 사람도 이 로그인 상태로 검사를 실행할 수 있습니다.\n\n' +
+    '로그인한 상태를 서버에 저장합니다.\n\n' +
+    '이 서버에 접속한 다른 사람도 이 로그인 상태로 검사를 실행할 수 있습니다.\n\n' +
     '계속할까요?')) return;
   $('doneLoginBtn').disabled = true;
   try {
@@ -1361,10 +1361,32 @@ function loadRunner() {
       ['ER', 'v' + info.version],
     ].map(([k, v]) => `<div class="kvrow"><dt>${k}</dt><dd>${esc(String(v))}</dd></div>`).join('');
     $('peerList').innerHTML = `<div class="peer"><i></i>접속 ${info.peers}명 (나 포함)</div>`;
+    paintWindowSupport(info.canOpenWindow !== false, info.host);
   }).catch(() => {});
 }
 loadRunner();
 loadHistory();
+
+/**
+ * 서버에 화면이 없으면 "직접 로그인" 창을 띄워도 아무도 볼 수 없다.
+ * 그런 환경에서는 그 방법을 권하지 않고, 왜 못 쓰는지 밝힌다.
+ */
+function paintWindowSupport(canOpen, host) {
+  const btn = $('openLoginBtn');
+  const hint = $('sessionHint');
+  if (canOpen) {
+    btn.disabled = false;
+    hint.innerHTML = `로그인 창이 <b>서버가 실행 중인 컴퓨터(${esc(host || '')}) 화면</b>에 뜹니다. ` +
+      `그 컴퓨터 앞에 있는 사람이 직접 로그인하면 OTP·SSO 무엇이든 통과할 수 있습니다.<br>` +
+      `<b>로그인한 상태가 서버에 저장되어, 접속한 다른 사람도 그 상태로 검사를 돌릴 수 있습니다.</b>`;
+  } else {
+    btn.disabled = true;
+    hint.innerHTML = `<b>이 서버에는 화면이 없어 이 방법을 쓸 수 없습니다.</b> ` +
+      `로그인 창을 띄워도 볼 수 있는 사람이 없기 때문입니다.<br>` +
+      `아이디·비밀번호 방식을 쓰시거나, 화면이 있는 컴퓨터에서 ER 을 실행해 로그인 상태를 만든 뒤 ` +
+      `<code>auth.local.json</code> 파일을 서버로 옮기세요.`;
+  }
+}
 
 /* ── 좌측 내비 — 화면을 실제로 바꾼다 ── */
 let view = 'dash';
