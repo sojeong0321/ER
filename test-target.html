@@ -57,11 +57,25 @@
 </div>
 
 <div class="grp">
+  <h2>링크 형태 — 실제 사이트에서 오탐이 잦던 유형</h2>
+  <!-- 앵커 링크: 클릭하면 아래 섹션으로 스크롤된다. 스크롤을 신호로 보지 않으면 무감으로 오판한다. -->
+  <a class="btn" id="lnk-anchor" href="#bottom">약관 상세 보기 (앵커 스크롤)</a>
+  <!-- javascript: 링크에 동작이 연결된 경우 — 사내 시스템에서 매우 흔하다 -->
+  <a class="btn" id="lnk-js-live" href="javascript:void(0)" onclick="out('javascript 링크 동작')">javascript 링크 (동작 있음)</a>
+  <!-- javascript: 링크인데 아무 동작도 없는 경우 — 무감으로 잡혀야 한다 -->
+  <a class="btn" id="lnk-js-dead" href="javascript:void(0)">javascript 링크 (동작 없음)</a>
+</div>
+
+<div class="grp">
   <h2>화면 변화 — PASS 로 판정되어야 함 (검사 순서상 마지막에 두어야 뒤 요소를 가리지 않는다)</h2>
   <button id="btn-modal" onclick="document.getElementById('dlg').showModal()">모달 열기 (화면 변화)</button>
 </div>
 
 <div id="output">대기 중</div>
+
+<!-- 앵커 링크가 실제로 스크롤되도록 페이지에 높이를 준다 -->
+<div style="height:1400px"></div>
+<h2 id="bottom" style="font-size:14px;color:#6b7280">약관 상세 (앵커 도착 지점)</h2>
 
 <dialog id="dlg">
   <p>모달이 열렸습니다.</p>

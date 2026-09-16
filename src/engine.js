@@ -23,6 +23,24 @@ const NOISE_REQUEST = /google-analytics|googletagmanager|gtag\/js|doubleclick|fa
 /** 코드 결함이 아닌 네트워크·리소스 잡음 콘솔 메시지 */
 const NOISE_CONSOLE = /net::ERR|Failed to load resource|ERR_|favicon|Download the React DevTools|\[HMR\]|DevTools/i;
 
+/** 한국·영국 등에서 쓰는 2단계 최상위 도메인 (co.kr, co.jp …) */
+const TWO_LEVEL_TLD = /^(co|or|ne|go|re|pe|ac|hs|ms|es|sc|com|net|org|gov|edu)\.(kr|jp|uk|au|nz|in|br|za|cn|tw|il|tr)$/;
+
+/**
+ * 등록 도메인을 구한다. admin.example.co.kr → example.co.kr
+ * 사내 시스템은 admin·api 처럼 서브도메인으로 나뉘는 경우가 많아,
+ * 호스트 이름을 그대로 비교하면 같은 서비스인데 외부로 분류된다.
+ */
+function siteOf(host) {
+  const h = String(host || '');
+  // IP 주소는 그대로 쓴다 (사내 시스템은 IP 로 접근하는 경우가 많다)
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.includes(':')) return h;
+  const parts = h.split('.');
+  if (parts.length <= 2) return h;
+  const last2 = parts.slice(-2).join('.');
+  return TWO_LEVEL_TLD.test(last2) ? parts.slice(-3).join('.') : last2;
+}
+
 const NOISE_SAMPLE_MS = 1000;   // 페이지 노이즈 측정 시간
 const POLL_MS = 100;            // 적응형 대기 폴링 간격
 const SETTLE_MS = 350;          // 신호 감지 후 추가 관찰 시간
@@ -87,6 +105,9 @@ async function startWatching(page) {
       t: (document.body?.innerText || '').length,
       d: document.querySelectorAll('dialog[open], [role=dialog], [aria-modal="true"]').length,
       f: document.activeElement ? document.activeElement.tagName + (document.activeElement.id || '') : '',
+      // 앵커 링크·"맨 위로" 버튼은 스크롤만 움직인다. 이걸 빼면 정상 동작이 무감으로 잡힌다.
+      y: Math.round(window.scrollY || document.documentElement.scrollTop || 0),
+      x: Math.round(window.scrollX || document.documentElement.scrollLeft || 0),
     });
     window.__erVis = vis;
     window.__erVis0 = vis();
@@ -102,6 +123,9 @@ async function readWatch(page) {
     return {
       hits: { ...window.__erHits },
       visChanged: !!(v0 && v && (v.h !== v0.h || v.d !== v0.d || v.f !== v0.f || v.t !== v0.t)),
+      // 스크롤은 별도로 본다. 페이지가 저절로 스크롤되는 경우는 드물어 노이즈 위험이 낮고,
+      // 반대로 앵커 이동은 이것 말고는 잡을 신호가 없다.
+      scrolled: !!(v0 && v && (Math.abs(v.y - v0.y) > 8 || Math.abs(v.x - v0.x) > 8)),
     };
   }).catch(() => null);
 }
@@ -113,7 +137,7 @@ async function readWatch(page) {
  * 여기서 본 위치(시계·캐러셀·폴링 배너 등)는 이후 클릭 판정에서 신호로 세지 않는다.
  */
 async function measureNoise(page) {
-  const empty = { sigs: new Set(), net: 0, visNoisy: false };
+  const empty = { sigs: new Set(), net: 0, visNoisy: false, scrollNoisy: false };
   if (!(await startWatching(page))) return empty;
 
   let net = 0;
@@ -127,8 +151,9 @@ async function measureNoise(page) {
   return {
     sigs: new Set(Object.keys(m.hits)),
     net,
-    // 화면 지문이 저절로 흔들리는 페이지면 화면 신호는 신뢰하지 않는다
+    // 화면 지문이 저절로 흔들리는 페이지면 그 신호는 신뢰하지 않는다
     visNoisy: m.visChanged === true,
+    scrollNoisy: m.scrolled === true,   // 자동 스크롤 배너가 도는 페이지
   };
 }
 
@@ -137,11 +162,12 @@ async function measureNoise(page) {
  * 노이즈로 본 위치에서 난 변화는 몇 번이든 무시하고, 새로운 위치의 변화만 신호로 인정한다.
  */
 function freshSignals(mut, noise) {
-  if (!mut) return { dom: false, vis: false, where: [] };
+  if (!mut) return { dom: false, vis: false, scroll: false, where: [] };
   const where = Object.keys(mut.hits).filter(k => !noise.sigs.has(k));
   return {
     dom: where.length > 0,
     vis: mut.visChanged === true && !noise.visNoisy,
+    scroll: mut.scrolled === true && !noise.scrollNoisy,
     where,
   };
 }
@@ -165,6 +191,7 @@ async function scanPage(page, pageUrl, opts = {}) {
 
   const results = [];
   const startHost = (() => { try { return new URL(pageUrl).hostname; } catch { return ''; } })();
+  const startSite = siteOf(startHost);
 
   // 팝업·새 탭은 검사 흐름을 깨므로 열리는 즉시 닫는다
   const ctx = page.context();
@@ -189,6 +216,7 @@ async function scanPage(page, pageUrl, opts = {}) {
         text: (n.innerText || n.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80),
         aria: n.getAttribute('aria-label') || '',
         title: n.getAttribute('title') || '',
+        value: n.value || '',
         href: n.getAttribute('href') || '',
         target: n.getAttribute('target') || '',
         disabled: n.disabled === true || n.getAttribute('aria-disabled') === 'true',
@@ -196,7 +224,7 @@ async function scanPage(page, pageUrl, opts = {}) {
       })).catch(() => null);
       if (!info) continue;
 
-      const label = (info.text || info.aria || info.title || info.id || `(${info.tag})`).slice(0, 80);
+      const label = (info.text || info.aria || info.title || info.value || info.id || `(${info.tag})`).slice(0, 80);
       const sel = buildSelector(info.tag, info.id, info.cls);
       const base = { page: pageUrl, label, sel, tag: info.tag };
       const push = r => {
@@ -209,20 +237,28 @@ async function scanPage(page, pageUrl, opts = {}) {
         push({ ...base, status: 'EXCLUDED', reason: 'disabled 요소', signals: {} });
         continue;
       }
-      const hitRule = EXCLUDE_RULES.find(r => label.includes(r));
+      // 제외 단어는 보이는 글자뿐 아니라 aria-label·title·value·id·class 까지 훑는다.
+      // 아이콘만 있는 삭제 버튼처럼 글자가 없는 경우를 놓치지 않기 위함이다.
+      const haystack = [info.text, info.aria, info.title, info.value, info.id, info.cls]
+        .filter(Boolean).join(' ').toLowerCase();
+      const hitRule = EXCLUDE_RULES.find(r => haystack.includes(String(r).toLowerCase()));
       if (hitRule) {
-        push({ ...base, status: 'EXCLUDED', reason: `제외 규칙: '${hitRule}'`, signals: {} });
+        push({ ...base, status: 'EXCLUDED', reason: `제외 단어 '${hitRule}' 포함`, signals: {} });
         continue;
       }
-      // 외부 도메인·새 탭 링크는 클릭하면 스캔 흐름을 벗어난다
+      // 링크 중 클릭하면 스캔 흐름을 벗어나는 것만 제외한다.
+      // javascript: 링크는 제외하지 않는다 — <a href="javascript:void(0)" onclick="…"> 는
+      // 사내 시스템에서 매우 흔하고, 바로 무감이 잘 나는 검사 대상이다.
       if (info.tag === 'a' && info.href) {
-        const abs = (() => { try { return new URL(info.href, pageUrl); } catch { return null; } })();
-        if (abs && !/^(https?|file):/.test(abs.protocol)) {
-          push({ ...base, status: 'EXCLUDED', reason: `${abs.protocol} 링크`, signals: {} });
+        const raw = info.href.trim();
+        const abs = (() => { try { return new URL(raw, pageUrl); } catch { return null; } })();
+
+        if (/^(mailto|tel|sms|ftp|file):/i.test(raw)) {
+          push({ ...base, status: 'EXCLUDED', reason: `${raw.split(':')[0]} 링크`, signals: {} });
           continue;
         }
-        if (abs && startHost && abs.hostname !== startHost) {
-          push({ ...base, status: 'EXCLUDED', reason: '외부 도메인 링크', signals: {} });
+        if (abs && /^https?:$/.test(abs.protocol) && startSite && siteOf(abs.hostname) !== startSite) {
+          push({ ...base, status: 'EXCLUDED', reason: `다른 사이트 링크 (${abs.hostname})`, signals: {} });
           continue;
         }
         if (info.target === '_blank') {
@@ -256,7 +292,7 @@ async function scanPage(page, pageUrl, opts = {}) {
         if (NOISE_REQUEST.test(req.url())) return;
         // 대상 사이트 자신에 대한 요청 실패만 결함 후보로 본다
         const h = (() => { try { return new URL(req.url()).hostname; } catch { return ''; } })();
-        if (h && startHost && h === startHost) failedOwn = req.url();
+        if (h && startSite && siteOf(h) === startSite) failedOwn = req.url();
       };
       const onConsole = msg => {
         if (!clickedAt || jsError || msg.type() !== 'error') return;
@@ -295,7 +331,7 @@ async function scanPage(page, pageUrl, opts = {}) {
         mut = m;
         if (waited < MIN_OBSERVE_MS) continue;
         const sig = freshSignals(m, noise);
-        if (sig.dom || sig.vis || netHits > 0 || page.url() !== urlBefore) {
+        if (sig.dom || sig.vis || sig.scroll || netHits > 0 || page.url() !== urlBefore) {
           await page.waitForTimeout(SETTLE_MS).catch(() => {});
           mut = (await readWatch(page)) || m;
           break;
@@ -315,13 +351,14 @@ async function scanPage(page, pageUrl, opts = {}) {
       }
 
       const urlChanged = navigated || page.url() !== urlBefore;
-      const ex = mut ? freshSignals(mut, noise) : { dom: navigated, vis: navigated };
+      const ex = mut ? freshSignals(mut, noise) : { dom: navigated, vis: navigated, scroll: false };
       const signals = {
         dom: ex.dom ? 1 : 0,
         net: netHits > 0 ? 1 : 0,
         url: urlChanged ? 1 : 0,
         console: jsError ? 1 : 0,
         vis: ex.vis ? 1 : 0,
+        scroll: ex.scroll ? 1 : 0,
       };
 
       // ── 판정 ──
@@ -332,7 +369,7 @@ async function scanPage(page, pageUrl, opts = {}) {
         status = 'ERROR'; reason = `HTTP ${badStatus.status} — ${shortUrl(badStatus.url)}`;
       } else if (failedOwn) {
         status = 'ERROR'; reason = `요청 실패 — ${shortUrl(failedOwn)}`;
-      } else if (!signals.dom && !signals.net && !signals.url && !signals.vis) {
+      } else if (!signals.dom && !signals.net && !signals.url && !signals.vis && !signals.scroll) {
         status = 'NO-RESPONSE'; reason = `클릭 후 ${(observedMs / 1000).toFixed(1)}초 동안 무변화`;
       } else {
         status = 'PASS'; reason = describe(signals);
@@ -375,7 +412,8 @@ function describe(s) {
   if (s.net) hit.push('NET');
   if (s.url) hit.push('URL');
   if (s.vis) hit.push('화면');
+  if (s.scroll) hit.push('스크롤');
   return hit.join(' + ') + ' 변화 감지';
 }
 
-module.exports = { scanPage, CLICKABLE };
+module.exports = { scanPage, CLICKABLE, siteOf };

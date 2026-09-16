@@ -25,7 +25,10 @@ const EXPECT = {
   'btn-500': 'ERROR',             // 서버 500 응답
   'btn-delete': 'EXCLUDED',       // 제외 규칙('삭제')
   'btn-disabled': 'EXCLUDED',     // disabled
-  'lnk-ext': 'EXCLUDED',          // 외부 도메인 링크
+  'lnk-ext': 'EXCLUDED',          // 다른 사이트 링크
+  'lnk-anchor': 'PASS',           // 앵커 스크롤 — 스크롤을 신호로 안 보면 무감으로 오판한다
+  'lnk-js-live': 'PASS',          // javascript: 링크에 동작이 연결된 경우
+  'lnk-js-dead': 'NO-RESPONSE',   // javascript: 링크인데 아무 동작도 없는 경우
   'btn-modal': 'PASS',            // 모달 표시 — 화면 변화
   'btn-modal-close': 'PASS',      // 모달 닫기
 };
