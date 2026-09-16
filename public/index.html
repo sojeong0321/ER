@@ -35,7 +35,8 @@
   /* ── 상단 바 ── */
   header{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(255,255,255,.93);backdrop-filter:blur(8px);z-index:30}
   .hbar{display:flex;align-items:center;gap:14px;height:62px}
-  .brand{display:flex;align-items:baseline;gap:9px;font-weight:750;font-size:19px;letter-spacing:-.02em}
+  .brand{display:flex;align-items:baseline;gap:9px;font-weight:750;font-size:19px;letter-spacing:-.02em;cursor:pointer;padding:4px 2px;border-radius:6px}
+  .brand:hover .sub{color:var(--ink2)}
   .brand .sub{font-weight:450;font-size:13px;color:var(--ink3);letter-spacing:0}
   .hstat{margin-left:auto;font-size:13px;color:var(--ink2)}
 
@@ -135,8 +136,11 @@
   .striplegend i{width:10px;height:10px;border-radius:2px;display:inline-block}
 
   /* 집계 탭 = 필터 */
-  .tabs{display:flex;gap:0;border-bottom:1px solid var(--line);margin:26px 0 0;overflow-x:auto}
-  .tab{padding:13px 18px;border-bottom:2.5px solid transparent;color:var(--ink2);font-size:14.5px;white-space:nowrap;display:flex;align-items:center;gap:8px;transition:.1s}
+  .tabrow{display:flex;gap:16px;align-items:flex-end;border-bottom:1px solid var(--line);margin:26px 0 0;flex-wrap:wrap}
+  .tabs{display:flex;gap:0;overflow-x:auto;flex:1;min-width:0}
+  .rescan{background:var(--ok);color:#fff;border-radius:8px;padding:9px 18px;font-size:14px;font-weight:620;white-space:nowrap}
+  .rescan:hover{background:#0a6845}
+  .tab{padding:13px 16px;border-bottom:2.5px solid transparent;color:var(--ink2);font-size:14.5px;white-space:nowrap;display:flex;align-items:center;gap:8px;transition:.1s}
   .tab:hover{color:var(--ink)}
   .tab b{font-size:16px;font-weight:700}
   .tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--ink)}
@@ -147,11 +151,22 @@
   .listtools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:16px 0}
   .listtools input{border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:14px;min-width:200px;flex:1;max-width:320px}
   .listtools input:focus{outline:none;border-color:var(--ink)}
-  .listtools .right{margin-left:auto;font-size:13.5px;color:var(--ink2)}
+  .listtools .right{margin-left:auto;font-size:13.5px;color:var(--ink2);display:flex;gap:14px;align-items:center}
+  .perpage{display:inline-flex;gap:6px;align-items:center;color:var(--ink2)}
+  .perpage select{border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:13.5px;background:var(--bg)}
+  .perpage select:focus{outline:none;border-color:var(--ink)}
+  .pager{display:flex;gap:10px;align-items:center;justify-content:center;padding:18px 0 40px}
+  .pager button{border:1px solid var(--line);border-radius:8px;padding:8px 16px;font-size:13.5px;font-weight:600}
+  .pager button:hover:not(:disabled){border-color:var(--ink)}
+  .pager button:disabled{opacity:.35;cursor:not-allowed}
+  .pager span{font-size:13.5px;color:var(--ink2);min-width:120px;text-align:center}
 
   /* 결과 목록 */
   .pgroup{margin-bottom:26px}
-  .pgtitle{display:flex;align-items:center;gap:10px;padding:10px 0;font-size:13.5px;color:var(--ink2);border-bottom:1px solid var(--line2)}
+  .pgtitle{display:flex;align-items:center;gap:10px;padding:10px 0;font-size:13.5px;color:var(--ink2);border-bottom:1px solid var(--line2);width:100%;text-align:left;cursor:pointer}
+  .pgtitle:hover{color:var(--ink)}
+  .pgtitle .caret{flex-shrink:0;width:14px;color:var(--ink3);transition:transform .15s}
+  .pgtitle[aria-expanded=false] .caret{transform:rotate(-90deg)}
   .pgtitle .u{font-family:var(--code);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .pgtitle .n{margin-left:auto;white-space:nowrap}
   .item{display:grid;grid-template-columns:4px 104px 1fr 220px;gap:14px;align-items:center;padding:13px 12px 13px 0;border-bottom:1px solid var(--line2);cursor:pointer;text-align:left;width:100%;transition:background .1s}
@@ -226,7 +241,7 @@
   .hrow .acts{display:flex;gap:8px}
 
   /* 내보내기 */
-  .exports{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+  .exports{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding-bottom:9px}
   .exports .scope{font-size:12.5px;color:var(--ink3);white-space:nowrap}
 
   /* 스크린샷 확대 */
@@ -281,7 +296,7 @@
 
 <header>
   <div class="wrap hbar">
-    <div class="brand">ER<span class="sub">자동 스모크 테스트</span></div>
+    <button type="button" class="brand" id="homeBtn" title="처음 화면으로">ER<span class="sub">자동 스모크 테스트</span></button>
     <div class="hstat" id="hstat"></div>
   </div>
 </header>
@@ -392,7 +407,7 @@
 
     <div class="hist" id="histBox" hidden>
       <h3>최근 검사</h3>
-      <p class="sub">같은 주소를 다시 검사하거나, 저장된 리포트를 열 수 있습니다.</p>
+      <p class="sub">이 서버가 실행 중인 PC에 최근 5회까지 남습니다. 같은 사내망에서 접속한 동료도 같은 목록을 봅니다.</p>
       <div id="histList"></div>
     </div>
 
@@ -423,7 +438,7 @@
           <p id="subline"></p>
         </div>
         <div class="vside">
-          <div class="exports" id="dlBox"></div>
+          <button type="button" class="rescan" id="rescanBtn">다시 검사</button>
         </div>
       </div>
 
@@ -439,14 +454,33 @@
       </div>
     </div>
 
-    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="tabrow">
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <div class="exports" id="dlBox"></div>
+    </div>
 
     <div class="listtools">
       <input id="q" placeholder="요소 이름이나 주소로 찾기" aria-label="결과 검색">
-      <span class="right" id="shown"></span>
+      <button type="button" class="linkbtn" id="foldBtn">모두 접기</button>
+      <span class="right">
+        <label class="perpage">한 번에
+          <select id="perPage" aria-label="한 번에 표시할 개수">
+            <option value="20">20개</option>
+            <option value="50" selected>50개</option>
+            <option value="100">100개</option>
+            <option value="0">전체</option>
+          </select>
+        </label>
+        <span id="shown"></span>
+      </span>
     </div>
 
     <div id="list"></div>
+    <div class="pager" id="pager" hidden>
+      <button type="button" id="prevPage">이전</button>
+      <span id="pageInfo"></span>
+      <button type="button" id="nextPage">다음</button>
+    </div>
   </section>
 </main>
 
@@ -492,6 +526,8 @@ const SIGNAL = { dom:'화면 구조', net:'서버 요청', url:'주소 이동', 
 const ORDER = { ERROR:0, 'NO-RESPONSE':1, UNCLICKABLE:2, PASS:3, EXCLUDED:4 };
 
 let DATA = [], META = {}, filter = 'ALL', picked = null, scanId = null, running = false;
+let perPage = 50, pageNo = 1;
+const folded = new Set();   // 접어 둔 페이지 주소
 let scope = 'path', liveCount = 0;
 
 /* ── 설정 UI ── */
@@ -509,7 +545,35 @@ $('loginOn').addEventListener('change', e => $('loginRow').classList.toggle('ope
 $('url').addEventListener('keydown', e => { if (e.key === 'Enter') startScan(); });
 $('goBtn').addEventListener('click', startScan);
 $('stopBtn').addEventListener('click', stopScan);
-$('q').addEventListener('input', renderList);
+$('q').addEventListener('input', () => { pageNo = 1; renderList(); });
+
+$('homeBtn').addEventListener('click', () => {
+  if (running && !confirm('검사가 진행 중입니다. 처음 화면으로 돌아갈까요? 검사는 계속됩니다.')) return;
+  $('out').classList.remove('on');
+  $('intro').classList.add('on');
+  $('errNote').classList.remove('on');
+  closeSide();
+  loadHistory();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+$('perPage').addEventListener('change', e => {
+  perPage = Number(e.target.value) || 0;
+  pageNo = 1;
+  renderList();
+});
+$('prevPage').addEventListener('click', () => { pageNo--; renderList(); scrollToList(); });
+$('nextPage').addEventListener('click', () => { pageNo++; renderList(); scrollToList(); });
+$('foldBtn').addEventListener('click', () => {
+  const pages = [...new Set(DATA.map(d => d.page))];
+  const allFolded = pages.every(p => folded.has(p));
+  if (allFolded) folded.clear(); else pages.forEach(p => folded.add(p));
+  renderList();
+});
+function scrollToList() {
+  const y = $('list').getBoundingClientRect().top + window.scrollY - 90;
+  window.scrollTo({ top: y, behavior: 'smooth' });
+}
 
 function toast(m) {
   const t = $('toast'); t.textContent = m; t.classList.add('on');
@@ -689,7 +753,7 @@ async function startScan() {
     if (!go) { $('adv').classList.add('open'); $('excl').focus(); return; }
   }
 
-  DATA = []; filter = 'ALL'; liveCount = 0;
+  DATA = []; filter = 'ALL'; liveCount = 0; pageSeq = 0; queuedLeft = 0; pageNo = 1; folded.clear();
   $('errNote').classList.remove('on');
   $('out').classList.remove('on');
   $('intro').classList.remove('on');
@@ -766,9 +830,12 @@ function fail(msg) {
 
 /* ── 서버 이벤트 ── */
 socket.on('log', ({ msg }) => { log(msg); $('runStage').textContent = msg; });
+let pageSeq = 0, queuedLeft = 0;
 socket.on('page', ({ url, visited, queued }) => {
+  pageSeq = visited || pageSeq + 1;
+  queuedLeft = queued || 0;
   $('runStage').textContent = url;
-  $('runCount').textContent = `${visited}번째 페이지` + (queued ? ` · 대기 ${queued}` : '');
+  paintProgress(0, 0);
   log(`페이지 검사 — ${url}`);
 });
 socket.on('element', ({ index, total, status }) => {
@@ -776,8 +843,20 @@ socket.on('element', ({ index, total, status }) => {
   const cell = document.createElement('div');
   cell.className = 'cell ' + (status === 'NO-RESPONSE' ? 'NR' : status);
   $('liveStrip').appendChild(cell);
-  $('runCount').textContent = `요소 ${index + 1}/${total} · 검사한 요소 ${liveCount}개`;
+  paintProgress(index + 1, total);
 });
+
+/**
+ * 진행 표시. 페이지 안에서의 진행과 전체 누적은 기준이 다르므로 한 줄에 섞지 않는다.
+ * (섞어 놓으면 "요소 30/149 · 검사한 요소 228개" 처럼 숫자가 어긋나 보인다)
+ */
+function paintProgress(done, total) {
+  const parts = [`${pageSeq}번째 페이지`];
+  if (total) parts.push(`이 페이지 ${done}/${total}`);
+  parts.push(`누적 ${liveCount}개 검사`);
+  if (queuedLeft) parts.push(`대기 ${queuedLeft}페이지`);
+  $('runCount').textContent = parts.join(' · ');
+}
 socket.on('pageResult', ({ count }) => log(`  요소 ${count}개 검사 완료`));
 socket.on('scanError', ({ msg }) => fail(msg));
 socket.on('done', ({ results, meta }) => {
@@ -840,6 +919,7 @@ function render() {
   $('tabs').onclick = e => {
     const t = e.target.closest('.tab'); if (!t) return;
     filter = t.dataset.f;
+    pageNo = 1;
     [...$('tabs').children].forEach(x => x.setAttribute('aria-selected', String(x.dataset.f === filter)));
     renderExports();
     renderList();
@@ -858,11 +938,11 @@ function renderExports() {
     <a class="dl" href="${q('xlsx')}">엑셀</a>
     <a class="dl" href="${q('md')}">Markdown</a>
     <a class="dl" href="${q('html')}" target="_blank" rel="noopener">리포트 열기</a>
-    <button class="dl" type="button" id="printBtn">인쇄</button>
-    <button class="dl" type="button" id="rescanBtn">다시 검사</button>`;
+    <button class="dl" type="button" id="printBtn">인쇄</button>`;
   $('printBtn').onclick = () => window.print();
-  $('rescanBtn').onclick = () => rescan();
 }
+
+$('rescanBtn').addEventListener('click', () => rescan());
 
 /** 같은 주소·같은 설정으로 다시 검사한다 */
 function rescan(entry) {
@@ -898,7 +978,7 @@ function loadHistory() {
   return fetch('/api/history').then(r => r.json()).then(list => {
     if (!Array.isArray(list) || !list.length) { $('histBox').hidden = true; return; }
     $('histBox').hidden = false;
-    $('histList').innerHTML = list.slice(0, 8).map((h, i) => `
+    $('histList').innerHTML = list.slice(0, 5).map((h, i) => `
       <div class="hrow">
         <span class="u" title="${esc(h.url)}">${esc(h.url)}</span>
         <span class="when">${esc(h.scannedAt)}</span>
@@ -927,42 +1007,109 @@ function visible() {
   });
 }
 
+/** 페이지 주소별로 묶고, 각 묶음 안에서는 심각한 것부터 정렬한다 */
+function grouped() {
+  const order = [];
+  const map = new Map();
+  for (const d of visible()) {
+    if (!map.has(d.page)) { map.set(d.page, []); order.push(d.page); }
+    map.get(d.page).push(d);
+  }
+  for (const list of map.values()) {
+    list.sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9));
+  }
+  return { order, map };
+}
+
 function renderList() {
-  const rows = visible();
-  $('shown').textContent = `${rows.length}개 표시 중`;
-  if (!rows.length) {
+  const { order, map } = grouped();
+  const total = [...map.values()].reduce((n, v) => n + v.length, 0);
+
+  if (!total) {
     $('list').innerHTML = `<div class="blank">조건에 맞는 항목이 없습니다.</div>`;
+    $('pager').hidden = true;
+    $('shown').textContent = '0개';
     return;
   }
-  // 페이지로 묶고, 각 묶음 안에서는 심각한 것부터
-  const byPage = new Map();
-  rows.forEach(d => { if (!byPage.has(d.page)) byPage.set(d.page, []); byPage.get(d.page).push(d); });
 
-  $('list').innerHTML = [...byPage.entries()].map(([page, items]) => {
-    items.sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9));
-    const c = tally(items);
-    const bad = c.ERROR + c['NO-RESPONSE'];
-    return `<div class="pgroup">
-      <div class="pgtitle"><span class="u">${hi(page)}</span>
-        <span class="n">${bad ? `<span style="color:var(--er);font-weight:600">결함 ${bad}건</span> · ` : ''}요소 ${items.length}개</span>
-      </div>
-      ${items.map(d => `
-        <button class="item ${d.status}" data-i="${d._i}">
-          <span class="bar"></span>
-          <span><span class="tag ${d.status}">${LABEL[d.status] || d.status}</span></span>
-          <span style="min-width:0">
-            <span class="lbl">${hi(d.label)}</span>
-            <span class="sel">${hi(d.sel)}</span>
-          </span>
-          <span class="why">${esc(d.reason || '')}</span>
-        </button>`).join('')}
-    </div>`;
+  // 접어 둔 묶음의 항목은 세지 않는다. 헤더는 남으므로 언제든 다시 펼칠 수 있다.
+  const openCount = order.reduce((n, p) => n + (folded.has(p) ? 0 : map.get(p).length), 0);
+  const size = perPage || Math.max(openCount, 1);
+  const lastPage = Math.max(1, Math.ceil(openCount / size));
+  pageNo = Math.min(Math.max(1, pageNo), lastPage);
+  const from = (pageNo - 1) * size;
+  const to = from + size;
+
+  // 펼쳐진 항목을 차례로 세면서 이번 쪽에 해당하는 구간만 그린다.
+  // 접힌 묶음은 항목 수가 0이라 순번이 밀리지 않으므로 빠지는 항목이 없다.
+  let cursor = 0;
+  const html = order.map(page => {
+    const all = map.get(page);
+    const isFolded = folded.has(page);
+    const items = isFolded ? [] : all;
+    const startAt = cursor;
+    cursor += items.length;
+
+    const shown = items.filter((_, i) => startAt + i >= from && startAt + i < to);
+    if (!isFolded && !shown.length && openCount > 0) {
+      // 이번 쪽에 이 묶음의 항목이 하나도 없으면 헤더도 접힌 것처럼만 표시한다
+      if (startAt >= to || startAt + items.length <= from) return headerHtml(page, all, false, 0) + '</div>';
+    }
+
+    return headerHtml(page, all, isFolded, shown.length) +
+      shown.map(d => itemHtml(d)).join('') + '</div>';
   }).join('');
 
+  $('list').innerHTML = html;
+  $('shown').textContent = openCount === total
+    ? `${total}개 중 ${Math.min(to, openCount) - from}개 표시`
+    : `${total}개 중 ${Math.min(to, openCount) - from}개 표시 (접힘 ${total - openCount}개)`;
+
+  $('pager').hidden = lastPage <= 1;
+  $('pageInfo').textContent = `${pageNo} / ${lastPage} 쪽`;
+  $('prevPage').disabled = pageNo <= 1;
+  $('nextPage').disabled = pageNo >= lastPage;
+
+  const allFolded = order.every(p => folded.has(p));
+  $('foldBtn').textContent = allFolded ? '모두 펼치기' : '모두 접기';
+
   $('list').onclick = e => {
-    const it = e.target.closest('.item'); if (!it) return;
-    openSide(Number(it.dataset.i));
+    const head = e.target.closest('.pgtitle');
+    if (head) {
+      const page = head.dataset.page;
+      if (folded.has(page)) folded.delete(page); else folded.add(page);
+      renderList();
+      return;
+    }
+    const it = e.target.closest('.item');
+    if (it) openSide(Number(it.dataset.i));
   };
+}
+
+function headerHtml(page, all, isFolded, shownCount) {
+  const c = tally(all);
+  const bad = c.ERROR + c['NO-RESPONSE'];
+  const note = isFolded ? `접힘 · 요소 ${all.length}개`
+    : shownCount && shownCount < all.length ? `요소 ${all.length}개 중 ${shownCount}개 표시`
+    : `요소 ${all.length}개`;
+  return `<div class="pgroup">
+    <button class="pgtitle" type="button" data-page="${esc(page)}" aria-expanded="${!isFolded}">
+      <span class="caret">▾</span>
+      <span class="u">${hi(page)}</span>
+      <span class="n">${bad ? `<span style="color:var(--er);font-weight:600">결함 ${bad}건</span> · ` : ''}${note}</span>
+    </button>`;
+}
+
+function itemHtml(d) {
+  return `<button class="item ${d.status}" data-i="${d._i}">
+      <span class="bar"></span>
+      <span><span class="tag ${d.status}">${LABEL[d.status] || d.status}</span></span>
+      <span style="min-width:0">
+        <span class="lbl">${hi(d.label)}</span>
+        <span class="sel">${hi(d.sel)}</span>
+      </span>
+      <span class="why">${esc(d.reason || '')}</span>
+    </button>`;
 }
 
 /* ── 상세 패널 ── */

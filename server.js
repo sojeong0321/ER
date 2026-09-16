@@ -231,6 +231,7 @@ app.get('/api/_test/ok', (req, res) => res.json({ ok: true }));
 /* ── 검사 이력 ── */
 
 const HISTORY_FILE = path.join(__dirname, 'reports', 'history.json');
+const HISTORY_MAX = 5;   // 최근 5회만 남긴다
 
 function readHistory() {
   try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); } catch { return []; }
@@ -266,8 +267,15 @@ function recordHistory(scanId, meta, results, options) {
 
   const list = readHistory();
   list.unshift(entry);
+  const kept = list.slice(0, HISTORY_MAX);
+
+  // 목록에서 밀려난 검사의 리포트 폴더는 지워 디스크가 계속 불어나지 않게 한다
+  for (const gone of list.slice(HISTORY_MAX)) {
+    fs.rm(path.join(__dirname, 'reports', String(gone.scanId)), { recursive: true, force: true }, () => {});
+  }
+
   fs.mkdirSync(path.dirname(HISTORY_FILE), { recursive: true });
-  fs.writeFileSync(HISTORY_FILE, JSON.stringify(list.slice(0, 100), null, 2), 'utf8');
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(kept, null, 2), 'utf8');
 }
 
 app.get('/api/history', (req, res) => {
