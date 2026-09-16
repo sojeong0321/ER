@@ -308,7 +308,7 @@
 
   /* 로그인 */
   .loginrow{display:none;flex-direction:column;gap:13px;width:100%;padding-top:13px;margin-top:13px;border-top:1px solid var(--line-2)}
-  .loginrow.on{display:flex}
+  .loginrow.open{display:flex}
   .authpane{width:100%;display:flex;flex-direction:column;gap:11px}
   .credrow{display:flex;gap:11px;align-items:flex-end;flex-wrap:wrap}
   .loginwait,.saved{display:flex;gap:11px;align-items:center;flex-wrap:wrap;width:100%;background:var(--ink-50);border-radius:9px;padding:13px 15px}
@@ -323,6 +323,8 @@
   .note{border-radius:9px;padding:14px 16px;margin-top:14px;font-size:13.5px;display:none;line-height:1.6}
   .note.on{display:block}
   .note.bad{background:var(--er-bg);border:1px solid var(--er-line);color:#991b1b}
+  .warnbox{background:var(--nr-bg);border:1px solid var(--nr-line);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.7;color:#92400e}
+  .warnbox b{color:var(--nr-deep, #b45309)}
   .note.bad b{display:block;margin-bottom:3px;color:var(--er)}
 
   .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px;min-height:30px}
@@ -435,8 +437,8 @@
                   <label class="fld"><span>요소당 관찰 시간</span><input id="observeMs" type="number" value="2000" min="300" step="100" style="width:110px"></label>
                   <label class="fld"><span>최대 페이지 수</span><input id="maxPages" type="number" value="50" min="1" style="width:100px"></label>
                   <label class="fld wide"><span>클릭하지 않을 단어 <span class="opt">(쉼표로 구분)</span></span><input id="excl" value="삭제, 탈퇴, 결제, 로그아웃, 구매, 주문" placeholder="삭제, 발송, 승인" spellcheck="false"></label>
-                  <label class="chk" title="결제창처럼 새 창으로 뜨는 화면을 확인하려면 켜세요."><input type="checkbox" id="clickNewTab"> 새 창 링크도 검사</label>
-                  <label class="chk" title="다른 사이트로 나가는 링크까지 눌러봅니다."><input type="checkbox" id="clickExternal"> 외부 링크도 검사</label>
+                  <label class="chk" title="새 창으로 열리는 링크를 눌러봅니다. 결제창처럼 새 창이 떠야 정상인 화면을 확인할 때 켜세요. 창은 열리자마자 닫습니다."><input type="checkbox" id="clickNewTab"> 새 창 링크도 검사</label>
+                  <label class="chk" title="다른 사이트로 나가는 링크까지 눌러봅니다. 검사 시간이 늘고 외부 사이트에 접속하게 됩니다."><input type="checkbox" id="clickExternal"> 외부 링크도 검사</label>
                   <label class="chk"><input type="checkbox" id="loginOn"> 로그인이 필요한 화면</label>
                 </div>
 
@@ -452,6 +454,10 @@
                       <label class="fld"><span>아이디</span><input id="loginId" autocomplete="off" style="width:120px"></label>
                       <label class="fld"><span>비밀번호</span><input id="loginPw" type="password" autocomplete="new-password" style="width:120px"></label>
                       <label class="fld"><span>OTP <span class="opt">(있으면)</span></span><input id="loginOtp" autocomplete="off" placeholder="123123" style="width:140px"></label>
+                    </div>
+                    <div class="warnbox">
+                      <b>이 PC에 저장하면 접속한 다른 사람도 이 계정으로 검사를 돌릴 수 있습니다.</b><br>
+                      비밀번호와 OTP 값은 화면에 보이지 않지만 검사에는 그대로 쓰입니다. 운영 계정 말고 <b>검사 전용 계정</b>을 쓰세요.
                     </div>
                     <div class="credrow">
                       <button type="button" class="openbtn sm" id="saveCredBtn">이 PC에 저장</button>
@@ -473,7 +479,8 @@
                     <div class="credrow" id="loginForm">
                       <label class="fld"><span>로그인 주소</span><input id="sessionUrl" placeholder="https://example.co.kr/login" style="min-width:270px"></label>
                       <button type="button" class="openbtn" id="openLoginBtn">로그인 창 열기</button>
-                      <p class="hint" style="width:100%">로그인 창이 이 PC 화면에 뜹니다. 직접 로그인하세요. OTP·SSO 무엇이든 통과할 수 있습니다.</p>
+                      <p class="hint" style="width:100%">로그인 창이 이 PC 화면에 뜹니다. 직접 로그인하세요. OTP·SSO 무엇이든 통과할 수 있습니다.<br>
+                        <b>로그인한 상태가 이 PC에 저장되어, 접속한 다른 사람도 그 상태로 검사를 돌릴 수 있습니다.</b></p>
                     </div>
                     <div class="loginwait" id="loginWait" hidden>
                       <span class="dot" style="background:var(--nr)"></span>
@@ -536,7 +543,7 @@
             <div class="hd">
               <div>
                 <h2>최근 검사</h2>
-                <div class="hint">이 PC의 최근 5회. 같은 사내망 동료와 결과를 공유합니다.</div>
+                <div class="hint">최근 5회입니다. 전체 기록은 1년간 보관됩니다.</div>
               </div>
               <div class="right"><button type="button" class="linkbtn" id="seeAllHist">모두 보기</button></div>
             </div>
@@ -569,9 +576,9 @@
               </div>
               <div class="presets">
                 <span class="hint">빠른 설정</span>
-                <button type="button" class="preset" data-preset="basic">기본</button>
-                <button type="button" class="preset" data-preset="admin">관리자 화면 (넉넉하게)</button>
-                <button type="button" class="preset" data-preset="min">최소</button>
+                <button type="button" class="preset" data-preset="basic" title="흔히 위험한 동작만 막습니다.">기본</button>
+                <button type="button" class="preset" data-preset="safe" title="되돌릴 수 없는 동작까지 폭넓게 막습니다. 운영·관리자 화면을 검사할 때 권장합니다.">안전 우선</button>
+                <button type="button" class="preset" data-preset="min" title="삭제·결제만 막습니다. 개발 환경에서 더 많은 요소를 검사하고 싶을 때 쓰세요.">최소</button>
               </div>
 
               <hr style="border:0;border-top:1px solid var(--line-2);margin:22px 0">
@@ -589,9 +596,9 @@
                 </label>
               </div>
               <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:14px">
-                <label class="chk" style="padding:0"><input type="checkbox" id="setNewTab"> 새 창 링크도 검사 <span class="hint">결제창처럼 새 창으로 뜨는 화면 확인</span></label>
-                <label class="chk" style="padding:0"><input type="checkbox" id="setExternal"> 외부 링크도 검사</label>
-                <label class="chk" style="padding:0"><input type="checkbox" id="setSSL"> 인증서 경고 무시 <span class="hint">개발 서버의 자체 서명 인증서 대응</span></label>
+                <label class="chk" style="padding:0" title="새 창으로 열리는 링크를 눌러봅니다. 결제창처럼 새 창이 떠야 정상인 화면을 확인할 때 켜세요. 창은 열리자마자 닫습니다."><input type="checkbox" id="setNewTab"> 새 창 링크도 검사</label>
+                <label class="chk" style="padding:0" title="다른 사이트로 나가는 링크까지 눌러봅니다. 검사 시간이 늘고 외부 사이트에 접속하게 됩니다."><input type="checkbox" id="setExternal"> 외부 링크도 검사</label>
+                <label class="chk" style="padding:0" title="사내 개발 서버는 정식 인증서가 없어 브라우저가 '안전하지 않음' 경고를 띄웁니다. 켜두면 그 경고를 넘기고 검사합니다. 개발·사내 주소를 검사하려면 대부분 켜두어야 합니다."><input type="checkbox" id="setSSL"> 인증서 경고를 넘기고 검사</label>
               </div>
 
               <div class="rulefoot">
@@ -602,6 +609,11 @@
               <hr style="border:0;border-top:1px solid var(--line-2);margin:24px 0 20px">
 
               <h3 style="font-size:13px;font-weight:650;margin-bottom:10px">저장된 로그인</h3>
+              <div class="warnbox" style="margin-bottom:12px">
+                <b>저장된 로그인은 이 PC에 접속한 누구나 쓸 수 있습니다.</b><br>
+                비밀번호·OTP 값이나 세션 쿠키가 화면에 보이지는 않지만, 검사를 실행하면 그 계정 권한으로 대상 화면의 버튼을 클릭합니다.
+                필요 없어지면 지워두세요.
+              </div>
               <div id="authState"></div>
             </div>
           </section>
@@ -611,9 +623,9 @@
             <div class="hd">
               <div>
                 <h2>검사 이력</h2>
-                <div class="hint">이 서버가 실행 중인 PC에 최근 5회까지 남습니다. 같은 사내망 동료도 같은 목록을 봅니다.</div>
+                <div class="hint">이 서버가 실행 중인 PC에 <b>1년간</b> 보관합니다. 같은 사내망 동료도 같은 목록을 봅니다.</div>
               </div>
-              <div class="right"><button type="button" class="linkbtn" id="clearHist">기록 지우기</button></div>
+              <div class="right"><span class="hint" id="histCount"></span></div>
             </div>
             <div class="bd" style="padding-top:8px">
               <table>
@@ -893,6 +905,11 @@ $('saveCredBtn').addEventListener('click', async () => {
     otp: $('loginOtp').value.trim(),
   };
   if (!body.url || !body.username) { toast('로그인 주소와 아이디를 입력하세요'); return; }
+  if (!confirm(
+    '이 PC에 계정 정보를 저장합니다.\n\n' +
+    '사내망으로 접속한 다른 사람도 이 계정으로 검사를 실행할 수 있습니다. ' +
+    '비밀번호와 OTP 값 자체는 화면에 표시되지 않지만, 검사에는 그대로 쓰입니다.\n\n' +
+    '운영 계정이 아닌 검사 전용 계정인지 확인하셨나요?')) return;
   try {
     const res = await fetch('/api/credentials', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -945,6 +962,10 @@ $('openLoginBtn').addEventListener('click', async () => {
 });
 
 $('doneLoginBtn').addEventListener('click', async () => {
+  if (!confirm(
+    '로그인한 상태를 이 PC에 저장합니다.\n\n' +
+    '사내망으로 접속한 다른 사람도 이 로그인 상태로 검사를 실행할 수 있습니다.\n\n' +
+    '계속할까요?')) return;
   $('doneLoginBtn').disabled = true;
   try {
     const res = await fetch('/api/session/save', { method: 'POST' });
@@ -1391,8 +1412,8 @@ $('seeAllHist').addEventListener('click', () => navigate('history'));
 /* ── 규칙 · 세부 설정 ── */
 const PRESETS = {
   basic: ['삭제', '탈퇴', '결제', '로그아웃', '구매', '주문'],
-  admin: ['삭제', '탈퇴', '결제', '로그아웃', '구매', '주문', '발송', '전송', '승인', '반려',
-          '확정', '정산', '환불', '마감', '배포', '초기화', '복구', '동기화'],
+  safe: ['삭제', '탈퇴', '결제', '로그아웃', '구매', '주문', '발송', '전송', '승인', '반려',
+         '확정', '정산', '환불', '마감', '배포', '복구', '동기화'],
   min: ['삭제', '결제'],
 };
 let RULES = [];
@@ -1525,10 +1546,12 @@ function renderHistoryView() {
   const SCOPE = { page: '이 페이지만', path: '하위 경로까지', domain: '사이트 전체' };
   if (!HISTORY.length) {
     $('historyList').innerHTML = '';
+    $('histCount').textContent = '';
     $('historyBlank').hidden = false;
     return;
   }
   $('historyBlank').hidden = true;
+  $('histCount').textContent = `${HISTORY.length}건`;
   $('historyList').innerHTML = HISTORY.map((h, i) => {
     const c = h.counts || {};
     const total = h.total || 1;
@@ -1558,13 +1581,7 @@ function renderHistoryView() {
   };
 }
 
-$('clearHist').addEventListener('click', async () => {
-  if (!confirm('검사 기록을 모두 지울까요? 저장된 리포트 파일은 남습니다.')) return;
-  await fetch('/api/history', { method: 'DELETE' }).catch(() => {});
-  await loadHistory();
-  renderHistoryView();
-  toast('검사 기록을 지웠습니다');
-});
+
 
 function visible() {
   const q = $('q').value.trim().toLowerCase();
