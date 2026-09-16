@@ -3,11 +3,11 @@
   "maxPages": 50,
   "scope": "path",
   "ignoreHTTPSErrors": true,
-  "excludeRules": ["삭제", "탈퇴", "결제", "로그아웃"],
+  "excludeRules": ["삭제", "탈퇴", "결제", "로그아웃", "취소", "초기화"],
   "login": {
     "enabled": false,
     "url": "",
-    "usernameSelector": "input[name='username'], input[name='id'], input[type='email']",
+    "usernameSelector": "input[name='username'], input[name='id'], input[name='userId'], input[type='email']",
     "passwordSelector": "input[name='password'], input[type='password']",
     "submitSelector": "button[type='submit'], input[type='submit']",
     "username": "",

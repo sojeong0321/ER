@@ -1,38 +1,79 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head><meta charset="UTF-8"><title>QA 테스트 대상 페이지</title></head>
+<head>
+<meta charset="UTF-8">
+<title>ER 판정 검증용 테스트 페이지</title>
+<style>
+  body{font-family:system-ui,-apple-system,'Malgun Gothic',sans-serif;padding:28px;max-width:760px;margin:0 auto;color:#1a1d26;line-height:1.6}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:#6b7280;font-size:13px;margin-bottom:6px}
+  .noise{background:#fff7e6;border:1px solid #f0d9a8;border-radius:8px;padding:9px 12px;font-size:13px;margin:14px 0}
+  .noise b{font-variant-numeric:tabular-nums}
+  .grp{margin:20px 0}
+  .grp h2{font-size:12px;color:#6b7280;font-weight:600;margin:0 0 8px;letter-spacing:.02em}
+  button,a.btn{font:inherit;font-size:14px;padding:8px 14px;margin:0 6px 8px 0;border:1px solid #d6dae2;background:#fff;border-radius:7px;cursor:pointer;display:inline-block;text-decoration:none;color:inherit}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  #output{margin-top:16px;padding:12px 14px;background:#f5f6f8;border-radius:8px;font-size:14px;min-height:22px}
+  dialog{border:1px solid #d6dae2;border-radius:10px;padding:20px}
+</style>
+</head>
 <body>
-<h1>셀러 상품 관리 (테스트용)</h1>
-<div id="output"></div>
+<h1>ER 판정 검증용 테스트 페이지</h1>
+<p class="sub">각 버튼은 기대 판정이 정해져 있습니다. <code>npm test</code> 가 이 페이지로 판정 정확도를 검증합니다.</p>
 
-<!-- 1. 정상: DOM 변경 -->
-<button id="btn-dom" onclick="document.getElementById('output').innerHTML='<p>저장되었습니다</p>'">저장 (정상-DOM)</button>
+<!--
+  이 시계는 의도적인 "노이즈"입니다.
+  1초마다 DOM이 저절로 바뀌므로, HTML 전체를 비교하는 방식이라면
+  아래 무감(NO-RESPONSE) 버튼들까지 전부 PASS로 오판하게 됩니다.
+  ER 이 이 상황에서도 무감을 잡아내는지가 핵심 검증 항목입니다.
+-->
+<div class="noise">🕐 자동 갱신 영역(노이즈) — 현재 시각 <b id="clock">--:--:--</b></div>
 
-<!-- 2. 정상: 정상 네트워크 요청 (data URL로 200 응답 보장) -->
-<button id="btn-net" onclick="fetch('data:text/plain,ok').then(r=>r.text()).then(()=>{document.getElementById('output').innerHTML='<p>동기화 완료</p>'})">동기화 (정상-NET)</button>
+<div class="grp">
+  <h2>정상 동작 — PASS 로 판정되어야 함</h2>
+  <button id="btn-dom" onclick="out('저장되었습니다')">저장 <span>(DOM 변화)</span></button>
+  <button id="btn-net" onclick="fetch('/api/_test/ok').then(()=>out('동기화 완료'))">동기화 (네트워크 요청)</button>
+  <button id="btn-url" onclick="location.hash='#detail'">상세보기 (URL 변화)</button>
+  <button id="btn-async" onclick="setTimeout(()=>out('지연 로딩 완료'),1200)">지연 로딩 (1.2초 뒤 반응)</button>
+</div>
 
-<!-- 2b. 에러: 서버 4xx/5xx 응답 (실제 서버 에러) -->
-<button id="btn-500" onclick="fetch('https://httpstat.us/500')">엑셀 다운로드 (에러-500)</button>
+<div class="grp">
+  <h2>무감 결함 — NO-RESPONSE 로 판정되어야 함</h2>
+  <button id="btn-dead1">필터 초기화 (핸들러 미연결)</button>
+  <button id="btn-dead2" onclick="void(0)">정렬 변경 (빈 핸들러)</button>
+</div>
 
-<!-- 3. 정상: URL 변경 (해시 라우팅) -->
-<button id="btn-url" onclick="location.hash='#detail'">상세보기 (정상-URL)</button>
+<div class="grp">
+  <h2>에러 결함 — ERROR 로 판정되어야 함</h2>
+  <button id="btn-error" onclick="nonExistentFunction()">미리보기 (JS 예외)</button>
+  <button id="btn-500" onclick="fetch('/api/_test/500')">엑셀 다운로드 (서버 500)</button>
+</div>
 
-<!-- 4. 무감: onClick 자체가 없음 (핸들러 미연결) -->
-<button id="btn-dead1">필터 초기화 (무감-핸들러없음)</button>
+<div class="grp">
+  <h2>검사 제외 — EXCLUDED 로 판정되어야 함</h2>
+  <button id="btn-delete" onclick="out('삭제됨')">삭제 (제외 규칙)</button>
+  <button id="btn-disabled" disabled onclick="out('x')">이전 (disabled)</button>
+  <a class="btn" id="lnk-ext" href="https://example.com">외부 사이트 (외부 도메인)</a>
+</div>
 
-<!-- 5. 무감: 핸들러는 있으나 아무것도 안 함 -->
-<button id="btn-dead2" onclick="void(0)">정렬 변경 (무감-빈핸들러)</button>
+<div class="grp">
+  <h2>화면 변화 — PASS 로 판정되어야 함 (검사 순서상 마지막에 두어야 뒤 요소를 가리지 않는다)</h2>
+  <button id="btn-modal" onclick="document.getElementById('dlg').showModal()">모달 열기 (화면 변화)</button>
+</div>
 
-<!-- 6. 에러: 콘솔 예외 발생 -->
-<button id="btn-error" onclick="nonExistentFunction()">미리보기 (에러-예외)</button>
+<div id="output">대기 중</div>
 
-<!-- 7. 정상이지만 비동기 지연(1.2초 후 반응) -->
-<button id="btn-async" onclick="setTimeout(()=>{document.getElementById('output').innerHTML='<p>지연 로딩 완료</p>'},1200)">지연 로딩 (정상-비동기)</button>
+<dialog id="dlg">
+  <p>모달이 열렸습니다.</p>
+  <button id="btn-modal-close" onclick="document.getElementById('dlg').close()">확인</button>
+</dialog>
 
-<!-- 8. 제외 대상: 파괴적 동작 -->
-<button id="btn-delete" onclick="document.getElementById('output').innerHTML='삭제됨'">삭제 (제외대상)</button>
-
-<!-- 9. disabled: 검사 제외 -->
-<button id="btn-disabled" disabled onclick="alert('x')">이전 (disabled)</button>
+<script>
+  function out(msg){ document.getElementById('output').textContent = msg; }
+  // 노이즈 발생원 — 1초마다 텍스트가 저절로 바뀐다
+  setInterval(() => {
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString('ko-KR');
+  }, 1000);
+</script>
 </body>
 </html>

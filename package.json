@@ -1,12 +1,13 @@
 {
-  "name": "smoke-test",
+  "name": "er-smoke-test",
   "version": "1.0.0",
-  "description": "자동 스모크 테스트 도구",
+  "description": "ER — 자동 스모크 테스트 (클릭 무감·에러 자동 탐지)",
   "main": "scan.js",
   "scripts": {
     "start": "node server.js",
     "scan": "node scan.js",
-    "build": "npx playwright install chromium"
+    "test": "node test/verify.js",
+    "postinstall": "playwright install chromium"
   },
   "engines": {
     "node": ">=20"
