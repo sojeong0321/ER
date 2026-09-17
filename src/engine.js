@@ -56,18 +56,19 @@ const MIN_OBSERVE_MS = 400;     // 최소 관찰 시간 (즉시 반응도 놓치
  * 그 전에 요소를 세면 한두 개밖에 잡히지 않는다. 클릭할 수 있는 요소 수가
  * 더 늘지 않을 때까지 지켜본다.
  */
-async function waitForContent(page, maxMs = 6000) {
+async function waitForContent(page, maxMs = 10000) {
+  const MIN_WATCH_MS = 1500;   // 로딩 초반에 잠깐 멈춘 것을 "다 그려졌다"로 오해하지 않도록
+  const STEP_MS = 300;
+  const STABLE_ROUNDS = 3;     // 이만큼 연속으로 그대로여야 인정한다
+
   const t0 = Date.now();
   let prev = -1, stable = 0;
   while (Date.now() - t0 < maxMs) {
+    await page.waitForTimeout(STEP_MS);
     const n = await page.$$eval(CLICKABLE, els => els.length).catch(() => 0);
-    if (n > 0 && n === prev) {
-      if (++stable >= 2) return n;      // 두 번 연속 그대로면 다 그려진 것으로 본다
-    } else {
-      stable = 0;
-    }
+    stable = (n > 0 && n === prev) ? stable + 1 : 0;
     prev = n;
-    await page.waitForTimeout(350);
+    if (stable >= STABLE_ROUNDS && Date.now() - t0 >= MIN_WATCH_MS) return n;
   }
   return prev;
 }
@@ -464,15 +465,35 @@ async function scanPage(page, pageUrl, opts = {}) {
       // ── 페이지를 벗어났으면 원위치 복귀 후 마커 재부여 ──
       if (urlChanged) {
         if (shouldStop()) break;
-        // 뒤로가기가 먼저다. 주소를 다시 불러오는 것보다 빠르고, 진행 중이던 이동을
-        // 덜 끊어 먹는다. 히스토리가 없거나 엉뚱한 곳으로 가면 주소로 다시 연다.
+
+        // 뒤로가기가 먼저다. 주소를 다시 불러오는 것보다 빠르고 진행 중이던 이동을 덜 끊는다.
+        // 돌아왔는지는 주소를 정규화해서 본다 (끝의 / 나 해시 차이로 실패 판정하지 않도록).
+        const same = u => String(u).split('#')[0].replace(/\/$/, '');
         let back = await page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 })
-          .then(() => page.url().split('#')[0] === pageUrl.split('#')[0]).catch(() => false);
-        if (!back) {
+          .then(() => same(page.url()) === same(pageUrl)).catch(() => false);
+
+        // 뒤로가기로 안 되면 주소로 다시 연다.
+        // 클릭으로 시작된 이동이 아직 진행 중이면 첫 시도가 "다른 이동이 끼어들었다" 로 막히므로,
+        // 잠깐 숨을 돌리고 몇 번 더 시도한다.
+        for (let attempt = 0; !back && attempt < 3; attempt++) {
+          if (attempt > 0) await page.waitForTimeout(400);
           back = await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
             .then(() => true).catch(() => false);
         }
-        if (!back) break;                     // 복귀 실패하면 이 페이지 검사 종료
+
+        if (!back) {
+          // 정말 못 돌아가면 남은 요소는 검사할 수 없다. 조용히 끝내지 않고 남긴다.
+          onElement?.({
+            index: i, total,
+            result: { page: pageUrl, label: '(검사 중단)', sel: pageUrl, status: 'ERROR',
+              reason: `${label} 를 누른 뒤 원래 화면으로 돌아오지 못해 남은 ${total - i - 1}개를 검사하지 못했습니다`,
+              signals: {} },
+          });
+          results.push({ page: pageUrl, label: '(검사 중단)', sel: pageUrl, status: 'ERROR',
+            reason: `${label} 를 누른 뒤 원래 화면으로 돌아오지 못해 남은 ${total - i - 1}개를 검사하지 못했습니다`,
+            signals: {} });
+          break;
+        }
 
         // 되돌아왔다고 바로 요소가 있는 것은 아니다. 화면이 다시 그려질 때까지 기다리지 않으면
         // 남은 요소를 못 찾아 나머지를 통째로 건너뛰게 된다.
