@@ -128,7 +128,8 @@ async function startWatching(page) {
       h: document.documentElement.scrollHeight,
       t: (document.body?.innerText || '').length,
       d: document.querySelectorAll('dialog[open], [role=dialog], [aria-modal="true"]').length,
-      f: document.activeElement ? document.activeElement.tagName + (document.activeElement.id || '') : '',
+      // 포커스는 신호로 세지 않는다. 버튼을 누르면 거의 항상 포커스가 옮겨가므로
+      // 아무 동작도 하지 않는 버튼까지 "반응했다" 로 판정하게 된다.
       // 앵커 링크·"맨 위로" 버튼은 스크롤만 움직인다. 이걸 빼면 정상 동작이 무감으로 잡힌다.
       y: Math.round(window.scrollY || document.documentElement.scrollTop || 0),
       x: Math.round(window.scrollX || document.documentElement.scrollLeft || 0),
@@ -146,7 +147,7 @@ async function readWatch(page) {
     const v0 = window.__erVis0, v = window.__erVis ? window.__erVis() : null;
     return {
       hits: { ...window.__erHits },
-      visChanged: !!(v0 && v && (v.h !== v0.h || v.d !== v0.d || v.f !== v0.f || v.t !== v0.t)),
+      visChanged: !!(v0 && v && (v.h !== v0.h || v.d !== v0.d || v.t !== v0.t)),
       // 스크롤은 별도로 본다. 페이지가 저절로 스크롤되는 경우는 드물어 노이즈 위험이 낮고,
       // 반대로 앵커 이동은 이것 말고는 잡을 신호가 없다.
       scrolled: !!(v0 && v && (Math.abs(v.y - v0.y) > 8 || Math.abs(v.x - v0.x) > 8)),
@@ -238,8 +239,17 @@ async function scanPage(page, pageUrl, opts = {}) {
     const total = await stampElements(page, CLICKABLE);
     const noise = await measureNoise(page);
 
-    for (let i = 0; i < total; i++) {
+    // 검사 차례. 지금 숨어 있는 요소는 뒤로 미뤘다가 한 번 더 본다.
+    // 탭으로 화면을 나누는 곳에서는 다른 탭을 눌러야 드러나는 요소가 많다.
+    const queue = [...Array(total).keys()];
+    const retried = new Set();
+
+    for (let qi = 0; qi < queue.length; qi++) {
       if (shouldStop()) break;
+      const i = queue[qi];
+
+      // 미뤄 둔 차례에 들어서면 그동안 화면이 바뀌었을 수 있으니 마커를 다시 찍는다
+      if (qi === total) await stampElements(page, CLICKABLE);
 
       let locator = page.locator(`[data-er-i="${i}"]`).first();
       if (!(await locator.count().catch(() => 0))) {
@@ -309,7 +319,12 @@ async function scanPage(page, pageUrl, opts = {}) {
         }
       }
       if (!(await locator.isVisible().catch(() => false))) {
-        push({ ...base, status: 'EXCLUDED', reason: '화면에 보이지 않음', signals: {} });
+        if (!retried.has(i)) {
+          retried.add(i);
+          queue.push(i);            // 한 바퀴 뒤에 다시 본다
+          continue;
+        }
+        push({ ...base, status: 'EXCLUDED', reason: await whyHidden(locator), signals: {} });
         continue;
       }
 
@@ -474,6 +489,39 @@ async function scanPage(page, pageUrl, opts = {}) {
   }
 
   return results;
+}
+
+/**
+ * 왜 화면에 보이지 않는지 알아낸다.
+ * "보이지 않음" 만으로는 다른 탭에 있는 것인지 원래 숨은 것인지 알 수 없어,
+ * 그 화면을 따로 검사해야 하는지 판단할 수 없다.
+ */
+async function whyHidden(locator) {
+  const why = await locator.evaluate(node => {
+    for (let el = node; el && el !== document.body; el = el.parentElement) {
+      const cs = getComputedStyle(el);
+      if (el.hasAttribute('hidden')) return { kind: 'hidden', tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '' };
+      if (cs.display === 'none') return { kind: 'display', tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '' };
+      if (cs.visibility === 'hidden') return { kind: 'visibility', tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '' };
+      if (Number(cs.opacity) === 0) return { kind: 'opacity', tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '' };
+    }
+    const r = node.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return { kind: 'zero' };
+    return { kind: 'other' };
+  }).catch(() => ({ kind: 'other' }));
+
+  // 탭 패널·접힌 영역 안에 있으면 다른 화면에 속한 요소다
+  if (/tabpanel|tabpane/i.test(why.role || '')) {
+    return '다른 탭에 있어 보이지 않음 (그 탭 화면을 따로 검사하세요)';
+  }
+  switch (why.kind) {
+    case 'hidden':
+    case 'display': return '접혀 있거나 다른 탭에 있어 보이지 않음';
+    case 'visibility': return '숨김 처리되어 보이지 않음';
+    case 'opacity': return '투명 처리되어 보이지 않음';
+    case 'zero': return '크기가 0이라 보이지 않음';
+    default: return '화면에 보이지 않음';
+  }
 }
 
 function shortUrl(u) {

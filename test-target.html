@@ -73,6 +73,20 @@
 </div>
 
 <div class="grp">
+  <h2>탭 전환 — 주소가 바뀌지 않고 화면만 바뀌는 경우</h2>
+  <div role="tablist" style="display:inline-flex;gap:6px">
+    <!-- 탭을 눌러 내용이 바뀌면 정상 -->
+    <button class="btn" id="tab-live" role="tab" aria-selected="false" onclick="switchTab()">내용 바꾸는 탭</button>
+    <!--
+      아무 동작도 하지 않는 탭. 클릭하면 포커스는 옮겨가지만 그뿐이다.
+      포커스 이동을 반응으로 세면 이것까지 정상으로 판정된다.
+    -->
+    <button class="btn" id="tab-dead" role="tab" aria-selected="false">동작 없는 탭</button>
+  </div>
+  <div id="tabbody" style="margin-top:8px;color:#6b7280;font-size:13px">첫 번째 탭 내용</div>
+</div>
+
+<div class="grp">
   <h2>화면 변화 — PASS 로 판정되어야 함 (검사 순서상 마지막에 두어야 뒤 요소를 가리지 않는다)</h2>
   <!-- 결제창처럼 새 창으로 뜨는 화면. 창이 열렸다는 사실 자체가 유일한 반응 신호다. -->
   <button id="btn-popup" onclick="window.open('/api/_test/ok','_blank','width=480,height=640')">결제창 열기 (새 창)</button>
@@ -93,6 +107,12 @@
 
 <script>
   function out(msg){ document.getElementById('output').textContent = msg; }
+  let tabN = 1;
+  function switchTab(){
+    tabN++;
+    document.getElementById('tabbody').textContent = tabN + '번째 탭 내용';
+    document.getElementById('tab-live').setAttribute('aria-selected','true');
+  }
   // 노이즈 발생원 — 1초마다 텍스트가 저절로 바뀐다
   setInterval(() => {
     document.getElementById('clock').textContent = new Date().toLocaleTimeString('ko-KR');
