@@ -643,7 +643,7 @@
               <div class="acts">
                 <button class="btn" type="button" id="printBtn">인쇄</button>
                 <a class="btn" id="openReport" target="_blank" rel="noopener">리포트 열기</a>
-                <button class="btn primary" type="button" id="rescanBtn">다시 검사</button>
+                <button class="btn primary" type="button" id="rescanBtn" title="지난 검사의 주소와 설정을 새 검사 폼에 불러옵니다. 검사는 확인 후 직접 시작하세요.">같은 설정으로</button>
                 <button class="btn" type="button" id="newScanBtn">처음 화면</button>
               </div>
             </div>
@@ -1279,12 +1279,17 @@ $('newScanBtn').addEventListener('click', () => {
 });
 $('printBtn').addEventListener('click', () => window.print());
 
-/** 같은 주소·같은 설정으로 다시 검사한다 */
+/**
+ * 지난 검사의 주소와 설정을 새 검사 폼에 불러온다.
+ * 검사를 바로 시작하지는 않는다 — 설정을 확인하고 사람이 직접 누르도록 한다.
+ */
 function rescan(entry) {
-  const target = entry?.url || META.url;
+  // 결과 화면에서 누르면 넘겨받은 것이 없다. 이력에서 이번 검사의 설정을 찾아 쓴다.
+  const src = entry || HISTORY.find(h => h.scanId === META.scanId) || null;
+  const target = src?.url || META.url;
   if (!target) return;
   $('url').value = target;
-  const st = entry?.settings;
+  const st = src?.settings;
   if (st) {
     if (st.scope) {
       scope = st.scope;
@@ -1304,8 +1309,13 @@ function rescan(entry) {
       $('paneSession').hidden = authMode !== 'session';
     }
   }
+  // 결과 화면을 닫고 새 검사 폼을 보여준다
+  hasResult = false;
+  view = 'dash';
+  paintView();
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  startScan();
+  $('url').focus();
+  toast('지난 검사 설정을 불러왔습니다. 확인하고 검사 시작을 누르세요');
 }
 
 /* ── 최근 검사 이력 ── */
@@ -1323,7 +1333,7 @@ function loadHistory() {
         <td class="mono" style="font-size:12px;color:var(--ink-500)">${h.total}</td>
         <td><span class="tblacts">
           <a class="linkbtn" href="/reports/${esc(h.scanId)}/smoke-report.html" target="_blank" rel="noopener">리포트</a>
-          <button class="linkbtn" type="button" data-i="${i}">재검사</button>
+          <button class="linkbtn" type="button" data-i="${i}" title="이 검사의 설정을 새 검사 폼에 불러옵니다">설정 불러오기</button>
         </span></td>
       </tr>`).join('');
     $('histList').onclick = e => {
@@ -1601,7 +1611,7 @@ function renderHistoryView() {
       <td><span class="tblacts">
         <a class="linkbtn" href="/reports/${esc(h.scanId)}/smoke-report.html" target="_blank" rel="noopener">리포트</a>
         <a class="linkbtn" href="/reports/${esc(h.scanId)}/smoke-report.xlsx">엑셀</a>
-        <button class="linkbtn" type="button" data-i="${i}">재검사</button>
+        <button class="linkbtn" type="button" data-i="${i}" title="이 검사의 설정을 새 검사 폼에 불러옵니다">설정 불러오기</button>
       </span></td>
     </tr>`;
   }).join('');
