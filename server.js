@@ -24,6 +24,16 @@ const { saveHtml, saveExcel, saveMarkdown, buildHtml, buildMarkdown } = require(
  */
 const cfg = require('./config.json');
 
+/**
+ * 공개 배포 모드 (ER_PUBLIC=1) — 인터넷에 열린 서버(Railway 등)에서 켠다.
+ * 사내망 도구로 쓸 때는 필요 없는 제한이지만, 누구나 접속하는 서버에서는
+ *   - 서버 안쪽(사내망·클라우드 내부 주소)을 검사 대상으로 삼지 못하게 막고
+ *   - 동시에 도는 검사 수와 한 번에 도는 페이지 수를 묶어 서버가 버티게 한다.
+ */
+const PUBLIC_MODE = /^(1|true|yes)$/i.test(process.env.ER_PUBLIC || '');
+const MAX_RUNNING = Number(process.env.ER_MAX_RUNNING) || (PUBLIC_MODE ? 2 : Infinity);
+const PUBLIC_MAX_PAGES = 20;
+
 // 처음 실행이면 여기서 기존 설정 파일을 프로젝트로 옮겨 담는다
 projects.list();
 
@@ -68,6 +78,29 @@ app.get('/reports/*', (req, res) => {
 </body></html>`);
 });
 
+/** 사설·루프백·링크 로컬 등 서버 안쪽 주소인가 */
+function isInternalIp(ip) {
+  const v = String(ip).toLowerCase().replace(/^::ffff:/, '');
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(v)) {
+    const [a, b] = v.split('.').map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+  }
+  return v === '::' || v === '::1' || /^f[cd]/.test(v) || /^fe[89ab]/.test(v);
+}
+
+/** 공개 모드에서 검사해도 되는 주소인지 — 안 되면 이유를 돌려준다 */
+async function publicTargetProblem(url) {
+  let host;
+  try { host = new URL(url).hostname.replace(/^\[|\]$/g, ''); } catch { return '주소 형식이 올바르지 않습니다.'; }
+  const addrs = await require('dns').promises.lookup(host, { all: true }).catch(() => null);
+  if (!addrs || !addrs.length) return `주소를 찾을 수 없습니다 — ${host}`;
+  if (addrs.some(a => isInternalIp(a.address))) {
+    return '이 데모 서버에서는 사내망·내부 주소를 검사할 수 없습니다. 인터넷에 공개된 주소를 넣거나 데모 페이지로 해 보세요.';
+  }
+  return null;
+}
+
 /** scanId → { status, events[], results, meta, stop } */
 const scans = new Map();
 const MAX_SCANS = 20;
@@ -91,7 +124,7 @@ function emitter(scanId) {
  * 검사 규칙은 화면에서 보낸 값을 쓰되(이번 검사에만 바꿀 수 있도록), 빠진 값은 프로젝트의
  * 기본값으로 채운다. 로그인은 화면에서 받지 않고 프로젝트에 저장된 것만 쓴다.
  */
-app.post('/api/scan', (req, res) => {
+app.post('/api/scan', async (req, res) => {
   const b = req.body || {};
   const url = String(b.url || '').trim();
   if (!/^https?:\/\//i.test(url)) {
@@ -99,6 +132,17 @@ app.post('/api/scan', (req, res) => {
   }
   const project = projects.get(b.projectId);
   if (!project) return res.status(400).json({ error: '프로젝트를 찾을 수 없습니다. 화면을 새로고침해 주세요.' });
+
+  const running = [...scans.values()].filter(x => x.status === 'running').length;
+  if (running >= MAX_RUNNING) {
+    return res.status(429).json({ error: `지금 다른 검사 ${running}건이 진행 중입니다. 잠시 뒤 다시 시도해 주세요.` });
+  }
+  if (PUBLIC_MODE) {
+    for (const target of [url, project.auth.mode === 'credentials' ? project.auth.url : null].filter(Boolean)) {
+      const problem = await publicTargetProblem(target);
+      if (problem) return res.status(400).json({ error: problem });
+    }
+  }
 
   const r = project.rules;
   const pick = (v, fallback) => (v === undefined || v === null || v === '' ? fallback : v);
@@ -117,7 +161,7 @@ app.post('/api/scan', (req, res) => {
     scope: ['page', 'path', 'domain'].includes(b.scope) ? b.scope : r.scope,
     excludeRules: Array.isArray(b.excludeRules) ? b.excludeRules : r.excludeRules,
     observeMs: Number(pick(b.observeMs, r.observeMs)) || 2000,
-    maxPages: Number(pick(b.maxPages, r.maxPages)) || 50,
+    maxPages: Math.min(Number(pick(b.maxPages, r.maxPages)) || 50, PUBLIC_MODE ? PUBLIC_MAX_PAGES : Infinity),
     clickNewTab: !!pick(b.clickNewTab, r.clickNewTab),
     clickExternal: !!pick(b.clickExternal, r.clickExternal),
     ignoreHTTPSErrors: r.ignoreHTTPSErrors !== false,
@@ -225,11 +269,14 @@ app.get('/api/runner', async (req, res) => {
     peers: io.engine.clientsCount,
     host: os.hostname().replace(/\.local$/, ''),
     canOpenWindow: canOpenWindow(),
+    publicMode: PUBLIC_MODE,
   });
 });
 
 /** 같은 사내망에서 접속할 수 있는 주소 — 화면에 그대로 띄운다 */
 app.get('/api/info', (req, res) => {
+  // 공개 서버에서는 컨테이너 내부 주소가 의미 없고, 알릴 필요도 없다
+  if (PUBLIC_MODE) return res.json({ public: true, addresses: [], hostname: '' });
   const port = server.address()?.port || PORT;
   res.json({
     port,

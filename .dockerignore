@@ -5,3 +5,7 @@ report
 .gitignore
 *.md
 !README.md
+# 계정·세션·로컬 설정은 이미지에 넣지 않는다
+data
+*.local.json
+*.migrated

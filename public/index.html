@@ -1133,11 +1133,14 @@ $('projNewForm').addEventListener('submit', async e => {
 });
 
 /* 새 검사 폼 — 등록된 주소를 눌러 고른다 */
+/** 공개 데모 서버면 체험용 페이지를 주소 칩 맨 앞에 둔다 — 처음 온 사람이 바로 눌러 볼 수 있도록 */
+let PUBLIC_MODE = false;
 function paintUrlChips() {
-  const urls = P?.urls || [];
+  const demo = PUBLIC_MODE ? [{ label: '데모 페이지로 해 보기', url: location.origin + '/test-target.html' }] : [];
+  const urls = [...demo, ...(P?.urls || [])];
   $('urlChips').hidden = !urls.length;
   const cur = $('url').value.trim();
-  $('urlChips').innerHTML = '<span class="hint" style="display:inline">등록된 주소</span>' + urls.map(u =>
+  $('urlChips').innerHTML = `<span class="hint" style="display:inline">${P?.urls?.length ? '등록된 주소' : '예시'}</span>` + urls.map(u =>
     `<button type="button" class="urlchip" data-url="${esc(u.url)}" aria-pressed="${u.url === cur}" title="${esc(u.url)}">${esc(u.label || u.url)}</button>`
   ).join('');
 }
@@ -1552,6 +1555,7 @@ function loadRunner() {
     ].map(([k, v]) => `<div class="kvrow"><dt>${k}</dt><dd>${esc(String(v))}</dd></div>`).join('');
     $('peerList').innerHTML = `<div class="peer"><i></i>접속 ${info.peers}명 (나 포함)</div>`;
     paintWindowSupport(info.canOpenWindow !== false, info.host);
+    if (!!info.publicMode !== PUBLIC_MODE) { PUBLIC_MODE = !!info.publicMode; paintUrlChips(); }
   }).catch(() => {});
 }
 loadRunner();
