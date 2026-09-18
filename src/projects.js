@@ -184,10 +184,14 @@ function publicView(p) {
 
 /* ────────────────── 변경 ────────────────── */
 
+/**
+ * 새 프로젝트는 기본 규칙으로 시작한다. 다른 프로젝트의 설정이 모르는 사이 따라오지 않도록,
+ * 복사는 copyFrom 을 명시했을 때만 한다 (그때도 값만 복사할 뿐 이후로는 서로 무관하다).
+ */
 function create({ name, copyFrom } = {}) {
   const all = load();
-  const src = all.find(p => p.id === (copyFrom || QUICK_ID));
-  const p = makeProject({ name, rules: src ? { ...src.rules } : undefined });
+  const src = copyFrom ? all.find(p => p.id === copyFrom) : null;
+  const p = makeProject({ name, rules: src ? { ...src.rules, excludeRules: [...src.rules.excludeRules] } : undefined });
   all.push(p);
   writeAll(all);
   return p;

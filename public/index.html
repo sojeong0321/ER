@@ -53,23 +53,51 @@
   .navitem:hover{background:var(--ink-50);color:var(--ink-900)}
   .navitem[aria-current=true]{background:var(--ink-100);color:var(--ink-900);font-weight:600}
   .navitem svg{width:16px;height:16px;flex-shrink:0;opacity:.7}
-  /* 프로젝트 목록 */
-  .projsec{margin-top:22px;display:flex;flex-direction:column;min-height:0;flex:1}
-  .projhead{display:flex;align-items:center;padding:0 10px 8px}
-  .projhead button{margin-left:auto;font-size:15px;line-height:1;color:var(--ink-400);padding:2px 6px;border-radius:6px}
-  .projhead button:hover{background:var(--ink-50);color:var(--brand-700)}
-  #projList{display:flex;flex-direction:column;gap:1px;overflow-y:auto;min-height:0}
-  .projitem{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;font-size:13px;color:var(--ink-600);width:100%;text-align:left}
-  .projitem:hover{background:var(--ink-50);color:var(--ink-900)}
-  .projitem[aria-current=true]{background:var(--brand-bg);color:var(--brand-700);font-weight:600}
-  .projitem .pdot{width:7px;height:7px;border-radius:2px;background:var(--ink-300);flex-shrink:0}
-  .projitem[aria-current=true] .pdot{background:var(--brand)}
-  .projitem .pn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .projitem .pk{font-size:10.5px;color:var(--ink-400);font-weight:400;flex-shrink:0}
-  .projadd{padding:4px 2px 0}
-  .projadd input{width:100%;border:1px solid var(--brand);border-radius:8px;padding:7px 10px;font-size:13px;box-shadow:0 0 0 3px var(--brand-bg)}
-  .projadd input:focus{outline:none}
-  .projadd .hint{padding:5px 4px 0}
+  /* 프로젝트 전환 — 내비 맨 위. 아래 메뉴는 모두 이 프로젝트 안의 것이다 */
+  .projsw{margin-top:18px;width:100%;display:flex;align-items:center;gap:11px;padding:10px 10px 10px 11px;
+    border:1px solid var(--line);border-radius:11px;background:var(--card);text-align:left;transition:border-color .12s,box-shadow .12s}
+  .projsw:hover{border-color:var(--ink-200);background:var(--ink-50)}
+  .projsw[aria-expanded=true]{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-bg);background:var(--card)}
+  .pav{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex-shrink:0;
+    font-size:13px;font-weight:700;color:#fff;background:var(--brand)}
+  .pav svg{width:15px;height:15px}
+  .pav.quick{background:var(--ink-800)}
+  .psw-t{flex:1;min-width:0;display:flex;flex-direction:column}
+  .psw-t .pn{font-size:14.5px;font-weight:650;letter-spacing:-.01em;line-height:1.35;color:var(--ink-900);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .psw-t .ps{font-size:11.5px;color:var(--ink-400);line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .projsw .chev{width:16px;height:16px;color:var(--ink-400);flex-shrink:0;transition:transform .15s}
+  .projsw[aria-expanded=true] .chev{transform:rotate(180deg);color:var(--brand-700)}
+  /* 좁은 화면에서는 내비가 사라지므로 상단 바에 같은 전환 버튼을 둔다 */
+  .projsw.top{display:none;margin:0;width:auto;max-width:240px;padding:5px 8px 5px 6px;gap:8px;border-radius:9px}
+  .projsw.top .pav{width:22px;height:22px;border-radius:6px;font-size:11px}
+  .projsw.top .pav svg{width:12px;height:12px}
+  .projsw.top .psw-t .pn{font-size:13.5px}
+  .projsw.top .psw-t .ps{display:none}
+
+  .projmenu{position:fixed;z-index:90;width:280px;max-width:calc(100vw - 24px);background:var(--card);border:1px solid var(--line);
+    border-radius:12px;box-shadow:0 12px 32px rgba(20,20,25,.14),0 2px 6px rgba(20,20,25,.06);padding:6px;
+    display:flex;flex-direction:column;max-height:min(460px,calc(100vh - 90px))}
+  .projmenu .grp{padding:8px 10px 5px}
+  .projmenu .scroll{overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:1px}
+  .projmenu hr{border:none;border-top:1px solid var(--line-2);margin:6px 2px}
+  .popt{display:flex;align-items:center;gap:10px;width:100%;padding:8px 9px;border-radius:8px;text-align:left}
+  .popt:hover,.popt:focus-visible{background:var(--ink-50)}
+  .popt .pav{width:26px;height:26px;border-radius:7px;font-size:11.5px}
+  .popt .pav svg{width:13px;height:13px}
+  .popt .psw-t .pn{font-size:13.5px;font-weight:550}
+  .popt[aria-selected=true] .psw-t .pn{font-weight:650;color:var(--brand-700)}
+  .popt:focus-visible,.pnew:focus-visible{outline:none;box-shadow:inset 0 0 0 1.5px var(--brand)}
+  .popt .ck{width:16px;height:16px;color:var(--brand);flex-shrink:0;visibility:hidden}
+  .popt[aria-selected=true] .ck{visibility:visible}
+  .pnew{display:flex;align-items:center;gap:10px;width:100%;padding:8px 9px;border-radius:8px;font-size:13.5px;color:var(--ink-600);text-align:left}
+  .pnew:hover,.pnew:focus-visible{background:var(--brand-bg);color:var(--brand-700)}
+  .pnew .plus{width:26px;height:26px;border-radius:7px;border:1px dashed var(--ink-300);display:grid;place-items:center;font-size:16px;line-height:1;color:var(--ink-400)}
+  .pnew:hover .plus,.pnew:focus-visible .plus{border-color:var(--brand);color:var(--brand)}
+  .pnewform{padding:4px 3px 3px}
+  .pnewform input{width:100%;border:1px solid var(--brand);border-radius:8px;padding:8px 10px;font-size:13.5px;box-shadow:0 0 0 3px var(--brand-bg)}
+  .pnewform input:focus{outline:none}
+  .pnewform .hint{display:block;padding:6px 3px 2px;font-size:11.5px;color:var(--ink-400)}
   .navfoot{margin-top:auto;padding:12px 10px 4px;border-top:1px solid var(--line-2)}
   .navfoot .eyebrow{margin-bottom:9px}
   .peer{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-500);padding:4px 0}
@@ -390,10 +418,13 @@
 
   @media(max-width:900px){
     nav.side{display:none}
+    .projsw.top{display:flex}
+    .crumb .cp{display:none}
+    .topbar{padding:0 16px}
     .content{padding:18px 16px 50px}
   }
   @media print{
-    nav.side,.topbar,.newscan,.kinds,.recent,.run,.tabrow,.listtools,.pager,.drawer,.veil,.lightbox,#toast,.verdict .acts,.sidecol{display:none!important}
+    nav.side,.projmenu,.topbar,.newscan,.kinds,.recent,.run,.tabrow,.listtools,.pager,.drawer,.veil,.lightbox,#toast,.verdict .acts,.sidecol{display:none!important}
     .shell{display:block} .cols{display:block}
     .content{padding:0}
     body{font-size:11px;background:#fff}
@@ -416,6 +447,8 @@
       </span>
     </button>
 
+    <button type="button" class="projsw" id="projSw" aria-haspopup="listbox" aria-expanded="false" aria-controls="projMenu" title="프로젝트 바꾸기"></button>
+
     <div class="navlist">
       <button type="button" class="navitem" data-nav="dash" aria-current="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -431,18 +464,6 @@
       </button>
     </div>
 
-    <div class="projsec">
-      <div class="projhead">
-        <span class="eyebrow">프로젝트</span>
-        <button type="button" id="projAddBtn" title="새 프로젝트" aria-label="새 프로젝트">＋</button>
-      </div>
-      <div id="projList"></div>
-      <form class="projadd" id="projAddForm" hidden>
-        <input id="projAddName" placeholder="프로젝트 이름 입력 후 Enter" maxlength="60" autocomplete="off" aria-label="새 프로젝트 이름">
-        <span class="hint">지금 프로젝트의 규칙을 복사해 만듭니다. Esc 로 취소.</span>
-      </form>
-    </div>
-
     <div class="navfoot">
       <div class="eyebrow">접속 중</div>
       <div id="peerList"><div class="peer"><i></i>나</div></div>
@@ -452,6 +473,7 @@
   <!-- ───────── 본문 ───────── -->
   <div class="main">
     <div class="topbar">
+      <button type="button" class="projsw top" id="projSwTop" aria-haspopup="listbox" aria-expanded="false" aria-controls="projMenu" title="프로젝트 바꾸기"></button>
       <span class="crumb" id="crumb">Dashboard / <b>새 검사</b></span>
       <span class="runner" id="runnerBadge"></span>
     </div>
@@ -802,6 +824,16 @@
   <div class="canvas"><img id="lbImg" alt="결함 발생 시점 화면"></div>
 </div>
 
+<div class="projmenu" id="projMenu" hidden>
+  <div class="scroll" id="projOpts" role="listbox" aria-label="프로젝트"></div>
+  <hr>
+  <button type="button" class="pnew" id="projNewBtn"><span class="plus">+</span>새 프로젝트</button>
+  <form class="pnewform" id="projNewForm" hidden>
+    <input id="projNewName" placeholder="프로젝트 이름 입력 후 Enter" maxlength="60" autocomplete="off" aria-label="새 프로젝트 이름">
+    <span class="hint">기본 규칙으로 시작합니다. 주소·로그인·규칙·이력은 프로젝트마다 따로 저장됩니다.</span>
+  </form>
+</div>
+
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -936,12 +968,101 @@ async function loadProjects(selectId) {
   else { paintScanSummary(); paintUrlChips(); }
 }
 
+const ICON_BOLT = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>';
+const ICON_CHEV = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg>';
+const ICON_CHECK = '<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5 10 17 19 7"/></svg>';
+const AV_COLORS = ['#7c5cff', '#0ea5e9', '#16a34a', '#e11d48', '#d97706', '#0d9488', '#9333ea', '#2563eb'];
+
+/** 프로젝트마다 이름 첫 글자와 고정된 색 — 목록에서 한눈에 구분되도록 */
+function avatar(x) {
+  if (x.quick) return `<span class="pav quick">${ICON_BOLT}</span>`;
+  let h = 0;
+  for (const ch of x.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const first = [...x.name.trim()][0] || '?';
+  return `<span class="pav" style="background:${AV_COLORS[h % AV_COLORS.length]}">${esc(first.toUpperCase())}</span>`;
+}
+function projSub(x) {
+  if (x.quick) return '주소만 넣고 바로 검사';
+  const auth = { none: '로그인 없음', credentials: '계정 로그인', session: '저장된 로그인' }[x.auth.mode] || '';
+  return [auth, x.urls.length ? `주소 ${x.urls.length}개` : '주소 없음'].join(' · ');
+}
+const projLabel = x => `${avatar(x)}<span class="psw-t"><span class="pn">${esc(x.name)}</span><span class="ps">${esc(projSub(x))}</span></span>`;
+
 function paintProjects() {
-  $('projList').innerHTML = PROJECTS.map(x => `
-    <button type="button" class="projitem" data-id="${esc(x.id)}" aria-current="${x.id === P?.id}" title="${esc(x.name)}">
-      <span class="pdot"></span><span class="pn">${esc(x.name)}</span>
-      ${x.auth.mode === 'none' ? '' : `<span class="pk">${x.auth.mode === 'session' ? '세션' : '계정'}</span>`}
-    </button>`).join('');
+  const head = P ? projLabel(P) + ICON_CHEV : '';
+  $('projSw').innerHTML = head;
+  $('projSwTop').innerHTML = head;
+  const opt = x => `<button type="button" class="popt" role="option" data-id="${esc(x.id)}" aria-selected="${x.id === P?.id}" title="${esc(x.name)}">${projLabel(x)}${ICON_CHECK}</button>`;
+  const quick = PROJECTS.filter(x => x.quick), rest = PROJECTS.filter(x => !x.quick);
+  $('projOpts').innerHTML = quick.map(opt).join('') +
+    '<hr><div class="grp eyebrow">프로젝트</div>' +
+    (rest.length ? rest.map(opt).join('') : '<span class="hint" style="padding:2px 10px 6px">아직 만든 프로젝트가 없습니다.</span>');
+}
+
+/* 프로젝트 전환 메뉴 — 내비의 버튼과 좁은 화면용 상단 버튼이 같은 메뉴를 연다 */
+let menuAnchor = null;
+
+function openProjMenu(anchor) {
+  menuAnchor = anchor;
+  const m = $('projMenu');
+  $('projNewForm').hidden = true;
+  $('projNewBtn').hidden = false;
+  m.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  m.style.width = Math.max(280, r.width) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  m.style.left = Math.max(12, Math.min(r.left, window.innerWidth - m.offsetWidth - 12)) + 'px';
+  anchor.setAttribute('aria-expanded', 'true');
+  (m.querySelector('.popt[aria-selected=true]') || m.querySelector('.popt'))?.focus();
+}
+function closeProjMenu(refocus) {
+  if ($('projMenu').hidden) return;
+  $('projMenu').hidden = true;
+  menuAnchor?.setAttribute('aria-expanded', 'false');
+  if (refocus) menuAnchor?.focus();
+  menuAnchor = null;
+}
+[$('projSw'), $('projSwTop')].forEach(btn => btn.addEventListener('click', () => {
+  if (menuAnchor === btn) closeProjMenu(); else { closeProjMenu(); openProjMenu(btn); }
+}));
+document.addEventListener('mousedown', e => {
+  if (!menuAnchor) return;
+  if ($('projMenu').contains(e.target) || menuAnchor.contains(e.target)) return;
+  closeProjMenu();
+});
+window.addEventListener('resize', () => closeProjMenu());
+
+$('projMenu').addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    if (!$('projNewForm').hidden) { $('projNewForm').hidden = true; $('projNewBtn').hidden = false; $('projNewBtn').focus(); }
+    else closeProjMenu(true);
+    return;
+  }
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
+  const items = [...$('projMenu').querySelectorAll('.popt, .pnew:not([hidden])')];
+  if (!items.length) return;
+  e.preventDefault();
+  const i = items.indexOf(document.activeElement);
+  const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1
+    : e.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
+  items[next].focus();
+});
+
+$('projOpts').addEventListener('click', e => {
+  const b = e.target.closest('.popt'); if (!b) return;
+  closeProjMenu(true);
+  selectProject(b.dataset.id);
+});
+
+function selectProject(id) {
+  if (id === P?.id) return;
+  if (running) { toast('검사가 끝난 뒤 프로젝트를 바꿀 수 있습니다'); return; }
+  const next = PROJECTS.find(x => x.id === id);
+  if (!next) return;
+  P = next;
+  paintProjects();
+  onProjectChanged();
 }
 
 /** 목록의 프로젝트 하나를 서버가 돌려준 최신 값으로 바꾼다 */
@@ -966,20 +1087,16 @@ async function putProject(patch) {
   return out;
 }
 
-$('projList').addEventListener('click', e => {
-  const b = e.target.closest('.projitem');
-  if (!b || b.dataset.id === P?.id) return;
-  if (running) { toast('검사가 끝난 뒤 프로젝트를 바꿀 수 있습니다'); return; }
-  P = PROJECTS.find(x => x.id === b.dataset.id);
-  paintProjects();
-  onProjectChanged();
-});
-
 /** 프로젝트를 바꾸면 새 검사 폼·이력·설정 화면이 모두 그 프로젝트 기준으로 바뀐다 */
 function onProjectChanged() {
   if (!P) return;
   storePid(P.id);
+  // 이전 프로젝트의 결과·이력을 먼저 비운다. 새 이력을 받기 전까지 잠깐이라도 보이지 않도록.
   hasResult = false;
+  DATA = []; META = {}; HISTORY = [];
+  delete $('cmpBox').dataset.ready;
+  $('weekBox').hidden = true;
+  if (view === 'history') renderHistoryView();
   $('errNote').classList.remove('on');
   closeSide();
   $('url').value = P.urls[0]?.url || '';
@@ -991,25 +1108,24 @@ function onProjectChanged() {
   paintView();
 }
 
-$('projAddBtn').addEventListener('click', () => {
-  $('projAddForm').hidden = false;
-  $('projAddName').value = '';
-  $('projAddName').focus();
+$('projNewBtn').addEventListener('click', () => {
+  if (running) { toast('검사가 끝난 뒤 만들 수 있습니다'); return; }
+  $('projNewBtn').hidden = true;
+  $('projNewForm').hidden = false;
+  $('projNewName').value = '';
+  $('projNewName').focus();
 });
-$('projAddName').addEventListener('keydown', e => { if (e.key === 'Escape') $('projAddForm').hidden = true; });
-$('projAddName').addEventListener('blur', () => { if (!$('projAddName').value.trim()) $('projAddForm').hidden = true; });
-$('projAddForm').addEventListener('submit', async e => {
+$('projNewForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const name = $('projAddName').value.trim();
+  const name = $('projNewName').value.trim();
   if (!name) return;
   if (running) { toast('검사가 끝난 뒤 만들 수 있습니다'); return; }
   try {
-    const res = await fetch('/api/projects', {
-      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ name, copyFrom: P?.id }),
-    });
+    // 지금 프로젝트의 설정을 복사하지 않는다 — 새 프로젝트는 기본값에서 시작한다
+    const res = await fetch('/api/projects', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ name }) });
     const out = await res.json();
     if (!res.ok) throw new Error(out.error);
-    $('projAddForm').hidden = true;
+    closeProjMenu();
     await loadProjects(out.id);
     navigate('rules');
     toast(`"${out.name}" 프로젝트를 만들었습니다. 주소와 로그인을 설정하세요`);
@@ -1095,7 +1211,7 @@ async function startScan() {
   $('pfill').style.width = '0%';
   view = 'dash'; hasResult = false; running = true;
   paintView();
-  $('crumb').innerHTML = `${esc(P.name)} / <b>검사 진행 중</b>`;
+  $('crumb').innerHTML = `<span class="cp">${esc(P.name)} / </span><b>검사 진행 중</b>`;
   paintLive();
   $('goBtn').disabled = true;
   $('stopBtn').hidden = false;
@@ -1373,7 +1489,10 @@ let HISTORY = [];
 
 function loadHistory() {
   if (!P) return Promise.resolve();
-  return fetch('/api/history?projectId=' + encodeURIComponent(P.id)).then(r => r.json()).then(list => {
+  const pid = P.id;
+  return fetch('/api/history?projectId=' + encodeURIComponent(pid)).then(r => r.json()).then(list => {
+    // 응답을 기다리는 사이 프로젝트를 바꿨다면 버린다 — 이전 프로젝트 이력이 섞이지 않도록
+    if (P?.id !== pid) return;
     HISTORY = Array.isArray(list) ? list : [];
     if (view === 'history') renderHistoryView();
     if (!HISTORY.length) { $('weekBox').hidden = true; paintView(); return; }
@@ -1487,7 +1606,7 @@ function paintView() {
   $('cmpBox').hidden = $('out').hidden || !$('cmpBox').dataset.ready;
 
   const title = { dash: hasResult ? '검사 결과' : '새 검사', history: '검사 이력', rules: '프로젝트 설정' }[view];
-  $('crumb').innerHTML = `${esc(P?.name || 'ER')} / <b>${title}</b>`;
+  $('crumb').innerHTML = `<span class="cp">${esc(P?.name || 'ER')} / </span><b>${title}</b>`;
 }
 
 function navigate(to) {

@@ -413,10 +413,11 @@ function recordHistory(scanId, meta, results, options) {
 }
 
 app.get('/api/history', (req, res) => {
-  const { url, projectId } = req.query;
-  let list = readHistory();
-  // 프로젝트가 생기기 전 기록은 빠른 검사로 본다
-  if (projectId) list = list.filter(h => (h.projectId || projects.QUICK_ID) === projectId);
+  const { url } = req.query;
+  // 이력은 항상 한 프로젝트 것만 내보낸다 — 프로젝트를 빼먹은 요청이 전체를 섞어 받지 않도록.
+  // 프로젝트가 생기기 전 기록은 빠른 검사로 본다.
+  const projectId = String(req.query.projectId || projects.QUICK_ID);
+  let list = readHistory().filter(h => (h.projectId || projects.QUICK_ID) === projectId);
   if (url) list = list.filter(h => h.url === url);
   res.json(list);
 });
