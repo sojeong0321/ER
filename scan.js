@@ -2,8 +2,9 @@
 /**
  * ER — 자동 스모크 테스트 CLI
  *
- * 사용: node scan.js <URL> [옵션]
- *   --scope page|path|domain   검사 범위 (기본: config.json)
+ * 사용: node scan.js [URL] [옵션]
+ *   --project <이름|id>         프로젝트의 규칙·로그인으로 검사 (기본: 빠른 검사)
+ *   --scope page|path|domain   검사 범위 (기본: 프로젝트 규칙)
  *   --observe <ms>             요소당 최대 관찰 시간
  *   --max-pages <n>            최대 순회 페이지 수
  *   --exclude "삭제,결제"       제외 규칙 (쉼표 구분)
@@ -13,7 +14,8 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
-const { doLogin, readSession } = require('./src/login');
+const { doLogin } = require('./src/login');
+const projects = require('./src/projects');
 const { crawl } = require('./src/crawler');
 const { saveHtml, saveExcel } = require('./src/reporter');
 const cfg = require('./config.json');
@@ -22,26 +24,51 @@ const args = process.argv.slice(2);
 const has = f => args.includes(f);
 const val = (f, d) => { const i = args.indexOf(f); return i !== -1 && args[i + 1] ? args[i + 1] : d; };
 
-const targetUrl = args.find(a => !a.startsWith('--') && !isOptionValue(a));
 function isOptionValue(a) {
   const i = args.indexOf(a);
-  return i > 0 && ['--scope', '--observe', '--max-pages', '--exclude', '--out'].includes(args[i - 1]);
+  return i > 0 && ['--project', '--scope', '--observe', '--max-pages', '--exclude', '--out'].includes(args[i - 1]);
 }
+
+if (has('--projects')) {
+  console.log('');
+  for (const p of projects.list()) {
+    const v = projects.publicView(p);
+    const auth = { none: '로그인 없음', credentials: `계정 ${v.auth.username || '(비어 있음)'}`, session: `직접 로그인 ${v.session.exists ? '저장됨' : '(저장 안 됨)'}` }[v.auth.mode];
+    console.log(`  ${p.id.padEnd(10)} ${p.name}  ·  주소 ${p.urls.length}개  ·  ${auth}`);
+  }
+  console.log('');
+  process.exit(0);
+}
+
+const projectKey = val('--project', projects.QUICK_ID);
+const project = projects.get(projectKey) || projects.list().find(p => p.name === projectKey);
+if (!project) {
+  console.error(`\n  프로젝트 "${projectKey}" 를 찾을 수 없습니다. 목록: node scan.js --projects\n`);
+  process.exit(1);
+}
+const rules = project.rules;
+
+// 주소를 생략하면 프로젝트에 등록된 첫 번째 주소를 검사한다
+const targetUrl = args.find(a => !a.startsWith('--') && !isOptionValue(a)) || project.urls[0]?.url;
 
 if (!targetUrl || has('--help') || has('-h')) {
   console.log(`
   ER — 자동 스모크 테스트
 
   사용법:
-    node scan.js <URL> [옵션]
+    node scan.js [URL] [옵션]
 
   옵션:
-    --scope page|path|domain   검사 범위 (기본: ${cfg.scope})
-    --observe <ms>             요소당 최대 관찰 시간 (기본: ${cfg.observeMs})
-    --max-pages <n>            최대 순회 페이지 수 (기본: ${cfg.maxPages})
-    --exclude "삭제,결제"       제외 규칙 (기본: ${(cfg.excludeRules || []).join(',')})
+    --project <이름|id>         프로젝트의 규칙·로그인으로 검사 (기본: 빠른 검사)
+                               주소를 생략하면 프로젝트의 첫 번째 주소를 검사
+    --projects                 프로젝트 목록 보기
+    --scope page|path|domain   검사 범위 (기본: ${rules.scope})
+    --observe <ms>             요소당 최대 관찰 시간 (기본: ${rules.observeMs})
+    --max-pages <n>            최대 순회 페이지 수 (기본: ${rules.maxPages})
+    --exclude "삭제,결제"       제외 규칙 (기본: ${rules.excludeRules.join(',')})
     --login                    config.json 의 로그인 정보 사용
-    --session                  저장된 로그인 사용 (npm run login 으로 미리 저장)
+    --session                  프로젝트에 저장된 직접 로그인 사용 (npm run login 으로 미리 저장)
+    --no-login                 프로젝트에 로그인 설정이 있어도 로그인하지 않고 검사
     --click-new-tab            새 탭으로 열리는 링크도 검사 (결제창 등 새 창 확인)
     --click-external           다른 사이트로 나가는 링크도 검사
     --out <dir>                리포트 저장 경로 (기본: ${cfg.outputDir})
@@ -50,20 +77,24 @@ if (!targetUrl || has('--help') || has('-h')) {
   예시:
     node scan.js https://example.com
     node scan.js http://localhost:8080 --scope domain --observe 1500
+    node scan.js --project "bhc 관리자"
 `);
   process.exit(targetUrl ? 0 : 1);
 }
 
 // ── 옵션 조립 (이전 버전은 이 옵션들을 crawl 에 넘기지 않아 전부 무시됐다) ──
-const scope = val('--scope', cfg.scope ?? 'path');
-const observeMs = parseInt(val('--observe', cfg.observeMs ?? 2000), 10);
-const maxPages = parseInt(val('--max-pages', cfg.maxPages ?? 50), 10);
-const excludeRules = val('--exclude', (cfg.excludeRules || []).join(','))
+const scope = val('--scope', rules.scope ?? 'path');
+const observeMs = parseInt(val('--observe', rules.observeMs ?? 2000), 10);
+const maxPages = parseInt(val('--max-pages', rules.maxPages ?? 50), 10);
+const excludeRules = val('--exclude', rules.excludeRules.join(','))
   .split(',').map(s => s.trim()).filter(Boolean);
-const useLogin = has('--login') || cfg.login?.enabled === true;
-const useSession = has('--session');
-const clickNewTab = has('--click-new-tab');
-const clickExternal = has('--click-external');
+// 로그인 방식: 명령줄 옵션이 프로젝트 설정보다 우선한다
+const noLogin = has('--no-login');
+const useSession = !noLogin && (has('--session') || project.auth.mode === 'session');
+const useProjectLogin = !noLogin && !useSession && project.auth.mode === 'credentials';
+const useLogin = !noLogin && !useSession && !useProjectLogin && (has('--login') || cfg.login?.enabled === true);
+const clickNewTab = has('--click-new-tab') || !!rules.clickNewTab;
+const clickExternal = has('--click-external') || !!rules.clickExternal;
 const outputDir = path.resolve(val('--out', cfg.outputDir ?? 'report'));
 const quiet = has('--quiet');
 
@@ -76,7 +107,7 @@ const color = (s, t) => `${C[s] || ''}${t}${C.reset}`;
 (async () => {
   console.log('');
   console.log(`  ${C.bold}ER — 자동 스모크 테스트${C.reset}`);
-  console.log(`  ${C.dim}대상 ${targetUrl}  ·  범위 ${scope}  ·  관찰 ${observeMs}ms${C.reset}`);
+  console.log(`  ${C.dim}프로젝트 ${project.name}  ·  대상 ${targetUrl}  ·  범위 ${scope}  ·  관찰 ${observeMs}ms${C.reset}`);
   console.log('');
 
   let browser;
@@ -94,9 +125,10 @@ const color = (s, t) => `${C[s] || ''}${t}${C.reset}`;
 
   let storageState;
   if (useSession) {
-    const saved = readSession();
+    const saved = projects.readSession(project.id);
     if (!saved) {
-      console.error('  저장된 로그인이 없습니다. 먼저 실행하세요:\n\n    npm run login <로그인 주소>\n');
+      const opt = project.id === projects.QUICK_ID ? '' : ` --project "${project.name}"`;
+      console.error(`  이 프로젝트에 저장된 로그인이 없습니다. 먼저 실행하세요:\n\n    npm run login -- <로그인 주소>${opt}\n`);
       await browser.close();
       process.exit(1);
     }
@@ -105,16 +137,20 @@ const color = (s, t) => `${C[s] || ''}${t}${C.reset}`;
   }
 
   const context = await browser.newContext({
-    ignoreHTTPSErrors: cfg.ignoreHTTPSErrors !== false,
+    ignoreHTTPSErrors: rules.ignoreHTTPSErrors !== false,
     acceptDownloads: false,
     viewport: { width: 1440, height: 900 },
     ...(storageState ? { storageState } : {}),
   });
   const page = await context.newPage();
 
-  if (!useSession && useLogin && cfg.login?.username) {
+  const loginCfg = useProjectLogin
+    ? { ...cfg.login, url: project.auth.url, username: project.auth.username, password: project.auth.password, otp: project.auth.otp }
+    : useLogin && cfg.login?.username ? cfg.login : null;
+  if (loginCfg) {
     try {
-      await doLogin(page, cfg.login);
+      console.log(`  ${C.dim}로그인 중 — ${loginCfg.url} · ${loginCfg.username}${C.reset}`);
+      await doLogin(page, loginCfg);
     } catch (e) {
       console.error(`  로그인 실패: ${e.message}`);
       await browser.close();

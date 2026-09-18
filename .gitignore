@@ -7,3 +7,5 @@ credentials.local.json
 node_modules/
 report/
 reports/
+data/
+*.migrated

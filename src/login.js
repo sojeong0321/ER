@@ -3,123 +3,42 @@
  *
  * 두 가지 방식을 지원한다.
  *
- *  1) 저장된 세션 (권장)
- *     `npm run login <주소>` 로 브라우저를 띄워 사람이 직접 로그인한 뒤 그 상태를 파일로 저장한다.
- *     OTP·SSO 처럼 사람이 개입해야 하는 인증도 이 방식이면 통과할 수 있고,
- *     검사할 때마다 계정 정보를 넣지 않아도 된다.
+ *  1) 직접 로그인
+ *     브라우저를 화면에 띄워 사람이 로그인한 뒤 그 상태를 저장한다 (captureSession).
+ *     OTP·SSO 처럼 사람이 개입해야 하는 인증도 이 방식이면 통과할 수 있다.
  *
  *  2) 자동 로그인
- *     아이디·비밀번호를 폼에 채워 넣는다. 2단계 인증이 없는 화면에서만 쓸 수 있다.
+ *     아이디·비밀번호(·OTP)를 폼에 채워 넣는다 (doLogin).
+ *
+ * 계정과 세션을 어디에 두는지는 여기서 정하지 않는다 — 프로젝트별로 src/projects.js 가 보관한다.
  */
-const fs = require('fs');
-const path = require('path');
 const totp = require('./totp');
 
-const SESSION_FILE = path.join(__dirname, '..', 'auth.local.json');
-const CRED_FILE = path.join(__dirname, '..', 'credentials.local.json');
-
-/* ────────────────── 저장된 세션 ────────────────── */
-
-function sessionPath() { return SESSION_FILE; }
-function hasSession() { return fs.existsSync(SESSION_FILE); }
-
-/** 저장된 세션 정보를 읽는다 (없으면 null) */
-function readSession() {
-  if (!hasSession()) return null;
-  try {
-    const raw = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'));
-    return { state: raw.state ?? raw, savedAt: raw.savedAt || null, url: raw.url || null };
-  } catch { return null; }
-}
-
-/** 로그인 상태를 파일로 저장한다 */
-function saveSession(state, landedOn) {
-  const savedAt = new Date().toISOString();
-  fs.writeFileSync(SESSION_FILE, JSON.stringify({ savedAt, url: landedOn, state }, null, 2), 'utf8');
-  return { savedAt, file: SESSION_FILE };
-}
-
-/** 저장된 로그인을 지운다 */
-function clearSession() {
-  if (fs.existsSync(SESSION_FILE)) fs.unlinkSync(SESSION_FILE);
-}
+/* ────────────────── 직접 로그인 ────────────────── */
 
 /**
- * 브라우저를 화면에 띄워 사람이 직접 로그인하게 하고, 끝난 상태를 저장한다.
+ * 브라우저를 화면에 띄워 사람이 직접 로그인하게 하고, 끝난 상태를 돌려준다.
  * @param {string} loginUrl 로그인 화면 주소
  * @param {function} waitForUser 사용자가 "다 됐다"고 알릴 때까지 기다리는 함수
  */
 async function captureSession(loginUrl, waitForUser, opts = {}) {
   const { chromium } = require('playwright');
   const browser = await chromium.launch({ headless: false, args: ['--no-sandbox'] });
-  const context = await browser.newContext({
-    ignoreHTTPSErrors: opts.ignoreHTTPSErrors !== false,
-    viewport: { width: 1440, height: 900 },
-  });
-  const page = await context.newPage();
-  await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  try {
+    const context = await browser.newContext({
+      ignoreHTTPSErrors: opts.ignoreHTTPSErrors !== false,
+      viewport: { width: 1440, height: 900 },
+    });
+    const page = await context.newPage();
+    await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-  await waitForUser(page);
+    await waitForUser(page);
 
-  const state = await context.storageState();
-  fs.writeFileSync(SESSION_FILE, JSON.stringify({
-    savedAt: new Date().toISOString(),
-    url: page.url(),
-    state,
-  }, null, 2), 'utf8');
-
-  const summary = {
-    file: SESSION_FILE,
-    cookies: state.cookies.length,
-    origins: state.origins.length,
-    landedOn: page.url(),
-  };
-  await browser.close();
-  return summary;
-}
-
-/* ────────────────── 저장된 계정 정보 ────────────────── */
-
-/**
- * 계정 정보를 이 PC 에 저장한다.
- * 비밀번호와 OTP 비밀키는 저장은 하되 화면으로 되돌려주지 않는다.
- * 이 서버는 사내망에 열려 있을 수 있어, 접속만 하면 값을 볼 수 있으면 안 되기 때문이다.
- */
-function saveCredentials(cred) {
-  const prev = readCredentials() || {};
-  const next = {
-    url: cred.url ?? prev.url ?? '',
-    username: cred.username ?? prev.username ?? '',
-    // 빈 값으로 덮어써 지워지는 일이 없도록, 값이 들어온 항목만 갱신한다
-    password: cred.password || prev.password || '',
-    otp: cred.otp || prev.otp || '',
-    savedAt: new Date().toISOString(),
-  };
-  fs.writeFileSync(CRED_FILE, JSON.stringify(next, null, 2), 'utf8');
-  return next;
-}
-
-function readCredentials() {
-  if (!fs.existsSync(CRED_FILE)) return null;
-  try { return JSON.parse(fs.readFileSync(CRED_FILE, 'utf8')); } catch { return null; }
-}
-
-function clearCredentials() {
-  if (fs.existsSync(CRED_FILE)) fs.unlinkSync(CRED_FILE);
-}
-
-/** 화면에 보여줘도 되는 정보만 추린다 */
-function describeCredentials() {
-  const c = readCredentials();
-  if (!c) return { exists: false };
-  return {
-    exists: true,
-    url: c.url || '',
-    username: c.username || '',
-    hasPassword: !!c.password,
-    hasOtp: !!c.otp,
-    savedAt: c.savedAt || null,
-  };
+    const state = await context.storageState();
+    return { state, cookies: state.cookies.length, origins: state.origins.length, landedOn: page.url() };
+  } finally {
+    await browser.close().catch(() => {});
+  }
 }
 
 /* ────────────────── 자동 로그인 ────────────────── */
@@ -370,8 +289,4 @@ function otpGuide() {
     '문자·이메일로 받는 방식이라면 "직접 로그인"으로 한 번 로그인해 상태를 저장하세요.';
 }
 
-module.exports = {
-  doLogin, captureSession, markOtpField, detectSecondFactor,
-  readSession, saveSession, clearSession, hasSession, sessionPath,
-  saveCredentials, readCredentials, clearCredentials, describeCredentials,
-};
+module.exports = { doLogin, captureSession, markOtpField, detectSecondFactor };

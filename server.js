@@ -12,29 +12,20 @@ const path = require('path');
 const crypto = require('crypto');
 const { Server } = require('socket.io');
 const { chromium } = require('playwright');
-const login_ = require('./src/login');
-const { doLogin, readSession, saveSession, clearSession } = login_;
+const { doLogin } = require('./src/login');
+const projects = require('./src/projects');
 const totp = require('./src/totp');
 const { crawl } = require('./src/crawler');
 const { saveHtml, saveExcel, saveMarkdown, buildHtml, buildMarkdown } = require('./src/reporter');
-const baseCfg = require('./config.json');
 
 /**
- * 설정은 두 겹이다.
- *  - config.json        저장소에 들어가는 기본값
- *  - config.local.json  이 PC 에서 바꾼 값 (git 에 올라가지 않는다)
- * 화면에서 저장하면 아래쪽에만 쓰고, 읽을 때 위에 덮어 쓴다.
+ * config.json 은 저장소에 들어가는 기본값이다. 로그인 폼 선택자 같은 공통 값만 여기서 쓰고,
+ * 검사 규칙·계정은 프로젝트마다 따로 둔다 (src/projects.js).
  */
-const LOCAL_CFG = path.join(__dirname, 'config.local.json');
+const cfg = require('./config.json');
 
-function readLocalCfg() {
-  try { return JSON.parse(fs.readFileSync(LOCAL_CFG, 'utf8')); } catch { return {}; }
-}
-function currentCfg() {
-  const local = readLocalCfg();
-  return { ...baseCfg, ...local, login: { ...baseCfg.login, ...(local.login || {}) } };
-}
-let cfg = currentCfg();
+// 처음 실행이면 여기서 기존 설정 파일을 프로젝트로 옮겨 담는다
+projects.list();
 
 const app = express();
 const server = http.createServer(app);
@@ -95,13 +86,24 @@ function emitter(scanId) {
   };
 }
 
+/**
+ * 검사를 시작한다.
+ * 검사 규칙은 화면에서 보낸 값을 쓰되(이번 검사에만 바꿀 수 있도록), 빠진 값은 프로젝트의
+ * 기본값으로 채운다. 로그인은 화면에서 받지 않고 프로젝트에 저장된 것만 쓴다.
+ */
 app.post('/api/scan', (req, res) => {
-  const { url, scope, login, excludeRules, observeMs, maxPages, authMode, clickNewTab, clickExternal } = req.body || {};
-  if (!url || !/^https?:\/\//i.test(String(url))) {
-    return res.status(400).json({ error: 'http:// 또는 https:// 로 시작하는 URL을 입력하세요.' });
+  const b = req.body || {};
+  const url = String(b.url || '').trim();
+  if (!/^https?:\/\//i.test(url)) {
+    return res.status(400).json({ error: 'http:// 또는 https:// 로 시작하는 주소를 입력하세요.' });
   }
+  const project = projects.get(b.projectId);
+  if (!project) return res.status(400).json({ error: '프로젝트를 찾을 수 없습니다. 화면을 새로고침해 주세요.' });
 
-  // 오래된 스캔부터 정리
+  const r = project.rules;
+  const pick = (v, fallback) => (v === undefined || v === null || v === '' ? fallback : v);
+
+  // 오래된 검사부터 정리
   while (scans.size >= MAX_SCANS) scans.delete(scans.keys().next().value);
 
   const scanId = crypto.randomUUID().slice(0, 8);
@@ -109,15 +111,16 @@ app.post('/api/scan', (req, res) => {
   res.json({ scanId });
 
   runScan(scanId, {
-    url: String(url).trim(),
-    scope: scope || cfg.scope || 'path',
-    login,
-    authMode: authMode || 'none',
-    excludeRules,
-    observeMs: Number(observeMs) || cfg.observeMs || 2000,
-    maxPages: Number(maxPages) || cfg.maxPages || 50,
-    clickNewTab: !!clickNewTab,
-    clickExternal: !!clickExternal,
+    url,
+    projectId: project.id,
+    projectName: project.name,
+    scope: ['page', 'path', 'domain'].includes(b.scope) ? b.scope : r.scope,
+    excludeRules: Array.isArray(b.excludeRules) ? b.excludeRules : r.excludeRules,
+    observeMs: Number(pick(b.observeMs, r.observeMs)) || 2000,
+    maxPages: Number(pick(b.maxPages, r.maxPages)) || 50,
+    clickNewTab: !!pick(b.clickNewTab, r.clickNewTab),
+    clickExternal: !!pick(b.clickExternal, r.clickExternal),
+    ignoreHTTPSErrors: r.ignoreHTTPSErrors !== false,
   });
 });
 
@@ -145,56 +148,51 @@ app.get('/api/report/:scanId', (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
-/* ── 기본 검사 규칙 ── */
+/* ── 프로젝트 ── */
 
-/** 화면에서 바꾼 기본값은 이 PC 에 저장되어, 사내망으로 접속한 동료에게도 같이 적용된다 */
-app.get('/api/settings', (req, res) => {
-  const c = currentCfg();
-  res.json({
-    observeMs: c.observeMs,
-    maxPages: c.maxPages,
-    scope: c.scope,
-    excludeRules: c.excludeRules || [],
-    clickNewTab: !!c.clickNewTab,
-    clickExternal: !!c.clickExternal,
-    ignoreHTTPSErrors: c.ignoreHTTPSErrors !== false,
-    changed: Object.keys(readLocalCfg()).length > 0,
-  });
+/** 비밀번호·OTP 값은 내보내지 않는다 (publicView 가 있음/없음만 남긴다) */
+app.get('/api/projects', (req, res) => {
+  res.json(projects.list().map(projects.publicView));
 });
 
-app.put('/api/settings', (req, res) => {
+app.post('/api/projects', (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: '프로젝트 이름을 입력하세요.' });
+  const p = projects.create({ name, copyFrom: req.body?.copyFrom });
+  res.json(projects.publicView(p));
+});
+
+app.put('/api/projects/:id', (req, res) => {
   const b = req.body || {};
-  const next = {};
-
-  const num = (v, min, max) => {
-    const n = Number(v);
-    return Number.isFinite(n) && n >= min && n <= max ? n : null;
-  };
-  const observeMs = num(b.observeMs, 300, 60000);
-  const maxPages = num(b.maxPages, 1, 1000);
-  if (observeMs === null || maxPages === null) {
-    return res.status(400).json({ error: '관찰 시간은 300~60000ms, 최대 페이지는 1~1000 사이여야 합니다.' });
+  if (b.auth?.otp) {
+    const kind = totp.describeInput(b.auth.otp);
+    if (kind.kind === 'invalid') return res.status(400).json({ error: kind.error });
   }
-  next.observeMs = observeMs;
-  next.maxPages = maxPages;
-  if (['page', 'path', 'domain'].includes(b.scope)) next.scope = b.scope;
-  if (Array.isArray(b.excludeRules)) {
-    next.excludeRules = [...new Set(b.excludeRules.map(x => String(x).trim()).filter(Boolean))].slice(0, 100);
+  try {
+    const p = projects.update(req.params.id, b);
+    res.json(projects.publicView(p));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
   }
-  next.clickNewTab = !!b.clickNewTab;
-  next.clickExternal = !!b.clickExternal;
-  next.ignoreHTTPSErrors = b.ignoreHTTPSErrors !== false;
-
-  fs.writeFileSync(LOCAL_CFG, JSON.stringify(next, null, 2), 'utf8');
-  cfg = currentCfg();
-  res.json({ ok: true });
 });
 
-/** 기본값으로 되돌린다 */
-app.delete('/api/settings', (req, res) => {
-  try { fs.unlinkSync(LOCAL_CFG); } catch {}
-  cfg = currentCfg();
-  res.json({ ok: true });
+app.delete('/api/projects/:id', (req, res) => {
+  try {
+    projects.remove(req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+/** 규칙을 저장소 기본값으로 되돌린다 */
+app.post('/api/projects/:id/reset-rules', (req, res) => {
+  try {
+    const p = projects.update(req.params.id, { rules: projects.defaultRules() });
+    res.json(projects.publicView(p));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 /**
@@ -221,8 +219,7 @@ app.get('/api/runner', async (req, res) => {
   res.json({
     browser: `chromium ${browserVersion}`,
     version: require('./package.json').version,
-    observeMs: cfg.observeMs,
-    maxPages: cfg.maxPages,
+    projects: projects.list().length,
     viewport: '1440×900',
     state: busy ? 'busy' : 'idle',
     peers: io.engine.clientsCount,
@@ -241,51 +238,53 @@ app.get('/api/info', (req, res) => {
   });
 });
 
-/** 저장된 로그인 세션이 있는지 알려준다 */
-app.get('/api/session', (req, res) => {
-  const s = readSession();
-  res.json({
-    ...(s ? { exists: true, savedAt: s.savedAt, url: s.url } : { exists: false }),
-    pending: !!loginSession,
-  });
-});
+/* ── 직접 로그인 ── */
 
 /**
- * 로그인용 브라우저 창을 띄운다.
- * 사람이 직접 로그인해야 통과되는 인증(OTP·SSO)이 있어도 이 경로로 세션을 확보할 수 있다.
- * 창은 이 서버가 실행 중인 PC 화면에 뜬다.
+ * 로그인용 브라우저 창을 띄우고, 사람이 로그인한 상태를 프로젝트에 저장한다.
+ * OTP·SSO 처럼 사람이 개입해야 하는 인증도 이 경로로 통과할 수 있다.
+ * 창은 이 서버가 실행 중인 컴퓨터 화면에 뜨므로 한 번에 하나만 연다.
  */
-let loginSession = null;   // { browser, context, page, url }
+let loginSession = null;   // { browser, context, page, url, projectId }
 
-app.post('/api/session/open', async (req, res) => {
-  const { url } = req.body || {};
-  if (!url || !/^https?:\/\//i.test(String(url))) {
+async function closeLoginWindow() {
+  if (!loginSession) return;
+  try { await loginSession.browser.close(); } catch {}
+  loginSession = null;
+}
+
+app.post('/api/projects/:id/session/open', async (req, res) => {
+  const project = projects.get(req.params.id);
+  if (!project) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
+
+  const url = String(req.body?.url || project.auth.url || '').trim();
+  if (!/^https?:\/\//i.test(url)) {
     return res.status(400).json({ error: 'http:// 또는 https:// 로 시작하는 로그인 주소를 입력하세요.' });
   }
   if (!canOpenWindow()) {
     return res.status(400).json({
       error: '이 서버에는 화면이 없어 로그인 창을 띄울 수 없습니다. ' +
-             '아이디·비밀번호 방식을 쓰거나, 화면이 있는 PC에서 ER 을 실행해 로그인 상태를 만든 뒤 ' +
-             'auth.local.json 을 서버로 옮기세요.',
+             '아이디·비밀번호 방식을 쓰거나, 화면이 있는 컴퓨터에서 ER 을 실행해 로그인 상태를 만든 뒤 ' +
+             `data/sessions/${project.id}.json 을 서버로 옮기세요.`,
     });
   }
-  if (loginSession) {
-    try { await loginSession.browser.close(); } catch {}
-    loginSession = null;
-  }
+
+  await closeLoginWindow();
   try {
     const browser = await chromium.launch({ headless: false, args: ['--no-sandbox'] });
     const context = await browser.newContext({
-      ignoreHTTPSErrors: cfg.ignoreHTTPSErrors !== false,
+      ignoreHTTPSErrors: project.rules.ignoreHTTPSErrors !== false,
       viewport: { width: 1440, height: 900 },
     });
     const page = await context.newPage();
-    await page.goto(String(url).trim(), { waitUntil: 'domcontentloaded', timeout: 30000 });
-    loginSession = { browser, context, page, url: String(url).trim() };
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    loginSession = { browser, context, page, url, projectId: project.id };
 
     // 사용자가 창을 그냥 닫으면 상태를 정리한다
     browser.on('disconnected', () => { loginSession = null; });
 
+    // 다음에 같은 주소로 열 수 있게 로그인 주소를 기억해 둔다
+    projects.update(project.id, { auth: { url } });
     res.json({ ok: true });
   } catch (e) {
     loginSession = null;
@@ -293,15 +292,17 @@ app.post('/api/session/open', async (req, res) => {
   }
 });
 
-/** 로그인이 끝난 상태를 저장한다 */
-app.post('/api/session/save', async (req, res) => {
+/** 로그인이 끝난 상태를 이 프로젝트에 저장한다 */
+app.post('/api/projects/:id/session/save', async (req, res) => {
   if (!loginSession) return res.status(400).json({ error: '열려 있는 로그인 창이 없습니다. 먼저 로그인 창을 여세요.' });
+  if (loginSession.projectId !== req.params.id) {
+    return res.status(409).json({ error: '다른 프로젝트의 로그인 창이 열려 있습니다. 그 창을 먼저 닫아 주세요.' });
+  }
   try {
     const state = await loginSession.context.storageState();
     const landedOn = loginSession.page.url();
-    const info = saveSession(state, landedOn);
-    await loginSession.browser.close().catch(() => {});
-    loginSession = null;
+    const info = projects.saveSession(req.params.id, state, landedOn);
+    await closeLoginWindow();
     res.json({ ok: true, cookies: state.cookies.length, landedOn, savedAt: info.savedAt });
   } catch (e) {
     res.status(500).json({ error: `저장하지 못했습니다: ${String(e.message).split('\n')[0]}` });
@@ -310,41 +311,18 @@ app.post('/api/session/save', async (req, res) => {
 
 /** 로그인 창을 닫는다 (저장하지 않음) */
 app.post('/api/session/cancel', async (req, res) => {
-  if (loginSession) {
-    await loginSession.browser.close().catch(() => {});
-    loginSession = null;
-  }
+  await closeLoginWindow();
   res.json({ ok: true });
 });
 
-/** 저장된 로그인을 지운다 */
-app.delete('/api/session', (req, res) => {
-  clearSession();
-  res.json({ ok: true });
-});
-
-/* ── 계정 정보 ── */
-
-app.get('/api/credentials', (req, res) => res.json(login_.describeCredentials()));
-
-app.post('/api/credentials', (req, res) => {
-  const { url, username, password, otp } = req.body || {};
-  if (otp) {
-    const kind = totp.describeInput(otp);
-    if (kind.kind === 'invalid') return res.status(400).json({ error: kind.error });
-  }
-  const saved = login_.saveCredentials({ url, username, password, otp });
-  res.json({ ok: true, savedAt: saved.savedAt });
-});
-
-app.delete('/api/credentials', (req, res) => {
-  login_.clearCredentials();
+app.delete('/api/projects/:id/session', (req, res) => {
+  projects.clearSession(req.params.id);
   res.json({ ok: true });
 });
 
 /** OTP 입력값을 확인한다 — 실제로 어떤 값이 입력될지 미리 보여준다 */
 app.post('/api/otp/check', (req, res) => {
-  const value = req.body?.otp || login_.readCredentials()?.otp;
+  const value = req.body?.otp || projects.get(req.body?.projectId)?.auth?.otp;
   if (!value) return res.status(400).json({ error: 'OTP 값이 비어 있습니다.' });
   const kind = totp.describeInput(value);
   if (kind.kind === 'invalid') return res.status(400).json({ error: kind.error });
@@ -396,6 +374,8 @@ function recordHistory(scanId, meta, results, options) {
 
   const entry = {
     scanId,
+    projectId: options.projectId || projects.QUICK_ID,
+    projectName: options.projectName || '',
     url: meta.url,
     scope: meta.scope,
     scannedAt: meta.scannedAt,
@@ -411,9 +391,9 @@ function recordHistory(scanId, meta, results, options) {
       observeMs: options.observeMs,
       maxPages: options.maxPages,
       excludeRules: options.excludeRules,
-      authMode: options.authMode,
       clickNewTab: options.clickNewTab,
       clickExternal: options.clickExternal,
+      ignoreHTTPSErrors: options.ignoreHTTPSErrors,
     },
   };
 
@@ -433,9 +413,12 @@ function recordHistory(scanId, meta, results, options) {
 }
 
 app.get('/api/history', (req, res) => {
-  const url = req.query.url;
-  const list = readHistory();
-  res.json(url ? list.filter(h => h.url === url) : list);
+  const { url, projectId } = req.query;
+  let list = readHistory();
+  // 프로젝트가 생기기 전 기록은 빠른 검사로 본다
+  if (projectId) list = list.filter(h => (h.projectId || projects.QUICK_ID) === projectId);
+  if (url) list = list.filter(h => h.url === url);
+  res.json(list);
 });
 
 
@@ -489,7 +472,10 @@ app.get('/api/report/:scanId/export', (req, res) => {
 async function runScan(scanId, options) {
   const scan = scans.get(scanId);
   const emit = emitter(scanId);
-  const { url, scope, login, authMode, excludeRules, observeMs, maxPages, clickNewTab, clickExternal } = options;
+  const { url, scope, excludeRules, observeMs, maxPages, clickNewTab, clickExternal } = options;
+  // 로그인 방식·계정은 화면이 아니라 프로젝트에서 읽는다 — 비밀번호가 화면을 오가지 않도록
+  const project = projects.get(options.projectId);
+  const auth = project?.auth || { mode: 'none' };
   let browser = null;
 
   try {
@@ -502,10 +488,12 @@ async function runScan(scanId, options) {
       throw new Error(browserHint(e));
     }
 
+    emit('log', { msg: `프로젝트: ${project?.name || '빠른 검사'}` });
+
     let storageState;
-    if (authMode === 'session') {
-      const saved = readSession();
-      if (!saved) throw new Error('저장된 로그인이 없습니다. 먼저 로그인 창을 열어 로그인해 주세요.');
+    if (auth.mode === 'session') {
+      const saved = projects.readSession(project.id);
+      if (!saved) throw new Error('이 프로젝트에 저장된 로그인이 없습니다. 프로젝트 설정에서 로그인 창을 열어 로그인해 주세요.');
       storageState = saved.state;
       emit('log', { msg: `저장된 로그인으로 검사합니다 (${new Date(saved.savedAt).toLocaleString('ko-KR')} 저장).` });
     }
@@ -513,22 +501,20 @@ async function runScan(scanId, options) {
     scan.browser = browser;
 
     const context = await browser.newContext({
-      ignoreHTTPSErrors: cfg.ignoreHTTPSErrors !== false,
+      ignoreHTTPSErrors: options.ignoreHTTPSErrors !== false,
       acceptDownloads: false,
       viewport: { width: 1440, height: 900 },
       ...(storageState ? { storageState } : {}),
     });
     const page = await context.newPage();
 
-    if (authMode === 'credentials') {
-      // 화면에서 받은 값이 없으면 이 PC 에 저장된 계정 정보를 쓴다
-      const saved = login_.readCredentials() || {};
+    if (auth.mode === 'credentials') {
       const merged = {
         ...cfg.login,
-        url: login?.url || saved.url,
-        username: login?.username || saved.username,
-        password: login?.password || saved.password,
-        otp: login?.otp || saved.otp,
+        url: auth.url,
+        username: auth.username,
+        password: auth.password,
+        otp: auth.otp,
         onLog: msg => emit('log', { msg }),
         shotDir: ensureDir(path.join(__dirname, 'reports', scanId, 'shots')),
       };
@@ -536,11 +522,10 @@ async function runScan(scanId, options) {
       // 어떤 값으로 로그인하는지 밝힌다. 비밀번호는 남기지 않는다.
       emit('log', {
         msg: `로그인 설정 — 주소 ${merged.url} · 아이디 ${merged.username} · ` +
-             `비밀번호 ${merged.password ? '입력됨' : '없음'} · OTP ${merged.otp ? '입력됨' : '없음'}` +
-             (login?.password ? '' : ' (저장된 값 사용)'),
+             `비밀번호 ${merged.password ? '입력됨' : '없음'} · OTP ${merged.otp ? '입력됨' : '없음'}`,
       });
-      if (!merged.url) throw new Error('로그인 주소가 비어 있습니다.');
-      if (!merged.username || !merged.password) throw new Error('아이디와 비밀번호를 입력하세요.');
+      if (!merged.url) throw new Error('로그인 주소가 비어 있습니다. 프로젝트 설정에서 입력하세요.');
+      if (!merged.username || !merged.password) throw new Error('아이디와 비밀번호가 없습니다. 프로젝트 설정에서 입력하세요.');
 
       emit('log', { msg: '로그인 중…' });
       await doLogin(page, merged);

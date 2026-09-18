@@ -53,6 +53,23 @@
   .navitem:hover{background:var(--ink-50);color:var(--ink-900)}
   .navitem[aria-current=true]{background:var(--ink-100);color:var(--ink-900);font-weight:600}
   .navitem svg{width:16px;height:16px;flex-shrink:0;opacity:.7}
+  /* 프로젝트 목록 */
+  .projsec{margin-top:22px;display:flex;flex-direction:column;min-height:0;flex:1}
+  .projhead{display:flex;align-items:center;padding:0 10px 8px}
+  .projhead button{margin-left:auto;font-size:15px;line-height:1;color:var(--ink-400);padding:2px 6px;border-radius:6px}
+  .projhead button:hover{background:var(--ink-50);color:var(--brand-700)}
+  #projList{display:flex;flex-direction:column;gap:1px;overflow-y:auto;min-height:0}
+  .projitem{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;font-size:13px;color:var(--ink-600);width:100%;text-align:left}
+  .projitem:hover{background:var(--ink-50);color:var(--ink-900)}
+  .projitem[aria-current=true]{background:var(--brand-bg);color:var(--brand-700);font-weight:600}
+  .projitem .pdot{width:7px;height:7px;border-radius:2px;background:var(--ink-300);flex-shrink:0}
+  .projitem[aria-current=true] .pdot{background:var(--brand)}
+  .projitem .pn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .projitem .pk{font-size:10.5px;color:var(--ink-400);font-weight:400;flex-shrink:0}
+  .projadd{padding:4px 2px 0}
+  .projadd input{width:100%;border:1px solid var(--brand);border-radius:8px;padding:7px 10px;font-size:13px;box-shadow:0 0 0 3px var(--brand-bg)}
+  .projadd input:focus{outline:none}
+  .projadd .hint{padding:5px 4px 0}
   .navfoot{margin-top:auto;padding:12px 10px 4px;border-top:1px solid var(--line-2)}
   .navfoot .eyebrow{margin-bottom:9px}
   .peer{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-500);padding:4px 0}
@@ -94,6 +111,29 @@
   .seg button{padding:6px 12px;border-radius:7px;font-size:13px;color:var(--ink-500)}
   .seg button:hover{background:var(--ink-50);color:var(--ink-900)}
   .seg button[aria-pressed=true]{background:var(--ink-100);color:var(--ink-900);font-weight:600}
+  .urlchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:9px}
+  .urlchip{border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:12px;color:var(--ink-600);background:var(--card);max-width:260px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .urlchip:hover{border-color:var(--brand);color:var(--brand-700)}
+  .urlchip[aria-pressed=true]{border-color:var(--brand);background:var(--brand-bg);color:var(--brand-700);font-weight:600}
+  .scansum{display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;margin-top:12px;padding:10px 12px;background:var(--ink-50);border-radius:9px;font-size:12.5px;color:var(--ink-500)}
+  .scansum b{color:var(--ink-800);font-weight:600}
+  .scansum .warn{color:var(--er);font-weight:600}
+  .scansum .linkbtn{margin-left:auto}
+  .projbadge{font-size:12px;color:var(--brand-700);background:var(--brand-bg);border-radius:999px;padding:3px 10px;font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .setsec{padding:20px 0;border-top:1px solid var(--line-2)}
+  .setsec:first-child{border-top:none;padding-top:4px}
+  .setsec>h3{font-size:13px;font-weight:650;margin-bottom:10px}
+  .urlrows{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+  .urlrows .row{display:flex;gap:8px;align-items:center}
+  .urlrows input{border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:13px;background:var(--card)}
+  .urlrows input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-bg)}
+  .urlrows .lb{width:150px}
+  .urlrows .u{flex:1;min-width:0;font-family:var(--mono);font-size:12.5px}
+  .urlrows .x{color:var(--ink-400);font-size:16px;padding:2px 8px}
+  .urlrows .x:hover{color:var(--er)}
+  .dangerbtn{color:var(--er);font-size:12.5px;margin-left:auto}
+  .dangerbtn:hover{text-decoration:underline}
   .more{margin-left:auto;font-size:13px;color:var(--ink-500);display:inline-flex;align-items:center;gap:6px}
   .more:hover{color:var(--brand-700)}
 
@@ -309,8 +349,6 @@
   .lightbox img{max-width:100%;border-radius:8px;background:#fff}
 
   /* 로그인 */
-  .loginrow{display:none;flex-direction:column;gap:13px;width:100%;padding-top:13px;margin-top:13px;border-top:1px solid var(--line-2)}
-  .loginrow.open{display:flex}
   .authpane{width:100%;display:flex;flex-direction:column;gap:11px}
   .credrow{display:flex;gap:11px;align-items:flex-end;flex-wrap:wrap}
   .loginwait,.saved{display:flex;gap:11px;align-items:center;flex-wrap:wrap;width:100%;background:var(--ink-50);border-radius:9px;padding:13px 15px}
@@ -389,8 +427,20 @@
       </button>
       <button type="button" class="navitem" data-nav="rules">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
-        규칙 · 세부 설정
+        프로젝트 설정
       </button>
+    </div>
+
+    <div class="projsec">
+      <div class="projhead">
+        <span class="eyebrow">프로젝트</span>
+        <button type="button" id="projAddBtn" title="새 프로젝트" aria-label="새 프로젝트">＋</button>
+      </div>
+      <div id="projList"></div>
+      <form class="projadd" id="projAddForm" hidden>
+        <input id="projAddName" placeholder="프로젝트 이름 입력 후 Enter" maxlength="60" autocomplete="off" aria-label="새 프로젝트 이름">
+        <span class="hint">지금 프로젝트의 규칙을 복사해 만듭니다. Esc 로 취소.</span>
+      </form>
     </div>
 
     <div class="navfoot">
@@ -413,7 +463,7 @@
         <div class="stack">
 
           <section class="card newscan">
-            <div class="hd"><h2>새 검사 실행</h2></div>
+            <div class="hd"><h2>새 검사 실행</h2><div class="right"><span class="projbadge" id="projBadge"></span></div></div>
             <div class="bd">
               <div class="fieldlabel">검사할 주소</div>
               <div class="urlrow">
@@ -423,6 +473,7 @@
                 <button class="go" id="goBtn">검사 시작</button>
                 <button class="stop" id="stopBtn" hidden>중단</button>
               </div>
+              <div class="urlchips" id="urlChips" hidden></div>
 
               <div class="optline">
                 <div class="seg" id="scopeSeg" role="group" aria-label="검사 범위">
@@ -440,58 +491,11 @@
                   <label class="fld wide"><span>클릭하지 않을 단어 <span class="opt">(쉼표로 구분)</span></span><input id="excl" value="삭제, 탈퇴, 결제, 로그아웃, 구매, 주문" placeholder="삭제, 발송, 승인" spellcheck="false"></label>
                   <label class="chk" title="새 창으로 열리는 링크를 눌러봅니다. 결제창처럼 새 창이 떠야 정상인 화면을 확인할 때 켜세요. 창은 열리자마자 닫습니다."><input type="checkbox" id="clickNewTab"> 새 창 링크도 검사</label>
                   <label class="chk" title="다른 사이트로 나가는 링크까지 눌러봅니다. 검사 시간이 늘고 외부 사이트에 접속하게 됩니다."><input type="checkbox" id="clickExternal"> 외부 링크도 검사</label>
-                  <label class="chk"><input type="checkbox" id="loginOn"> 로그인이 필요한 화면</label>
                 </div>
-
-                <div class="loginrow" id="loginRow">
-                  <div class="seg" id="authSeg" role="group" aria-label="로그인 방식">
-                    <button type="button" data-m="credentials" aria-pressed="true">아이디·비밀번호</button>
-                    <button type="button" data-m="session" aria-pressed="false">직접 로그인</button>
-                  </div>
-
-                  <div class="authpane" id="paneCred">
-                    <div class="credrow">
-                      <label class="fld"><span>로그인 주소</span><input id="loginUrl" placeholder="https://example.co.kr/login" style="min-width:240px"></label>
-                      <label class="fld"><span>아이디</span><input id="loginId" autocomplete="off" style="width:120px"></label>
-                      <label class="fld"><span>비밀번호</span><input id="loginPw" type="password" autocomplete="new-password" style="width:120px"></label>
-                      <label class="fld"><span>OTP <span class="opt">(있으면)</span></span><input id="loginOtp" autocomplete="off" placeholder="123123" style="width:140px"></label>
-                    </div>
-                    <div class="warnbox">
-                      <b>서버에 저장하면 접속한 다른 사람도 이 계정으로 검사를 돌릴 수 있습니다.</b><br>
-                      비밀번호와 OTP 값은 화면에 보이지 않지만 검사에는 그대로 쓰입니다. 운영 계정 말고 <b>검사 전용 계정</b>을 쓰세요.
-                    </div>
-                    <div class="credrow">
-                      <button type="button" class="openbtn sm" id="saveCredBtn">서버에 저장</button>
-                      <button type="button" class="linkbtn" id="checkOtpBtn" title="OTP 칸에 실제로 어떤 값이 입력될지 미리 보여줍니다.">입력될 값 미리보기</button>
-                      <button type="button" class="linkbtn" id="forgetCredBtn" hidden>저장된 계정 지우기</button>
-                      <span class="hint" id="credState"></span>
-                    </div>
-                    <p class="hint">OTP 칸에는 <b>넣을 값을 그대로</b> 적으면 됩니다. 개발 서버에서 <code>123123</code> 처럼 통하는 고정 코드가 있다면 그 값을 넣으세요.
-                      인증 앱을 쓴다면 앱 등록 화면의 비밀키를 넣으면 코드를 매번 새로 만들어 입력합니다. 문자·이메일로 받는 OTP는 <b>직접 로그인</b>을 쓰세요.</p>
-                  </div>
-
-                  <div class="authpane" id="paneSession" hidden>
-                    <div class="saved" id="savedBox" hidden>
-                      <span class="dot"></span>
-                      <div><b>로그인된 상태로 검사합니다</b><span class="hint" id="savedAt"></span></div>
-                      <button type="button" class="linkbtn" id="reloginBtn">다시 로그인</button>
-                      <button type="button" class="linkbtn" id="forgetBtn">로그인 지우기</button>
-                    </div>
-                    <div class="credrow" id="loginForm">
-                      <label class="fld"><span>로그인 주소</span><input id="sessionUrl" placeholder="https://example.co.kr/login" style="min-width:270px"></label>
-                      <button type="button" class="openbtn" id="openLoginBtn">로그인 창 열기</button>
-                      <p class="hint" style="width:100%" id="sessionHint">로그인 창이 <b>서버가 실행 중인 컴퓨터 화면</b>에 뜹니다. 직접 로그인하면 OTP·SSO 무엇이든 통과할 수 있습니다.<br>
-                        <b>로그인한 상태가 서버에 저장되어, 접속한 다른 사람도 그 상태로 검사를 돌릴 수 있습니다.</b></p>
-                    </div>
-                    <div class="loginwait" id="loginWait" hidden>
-                      <span class="dot" style="background:var(--nr)"></span>
-                      <div><b>로그인 창에서 로그인하세요</b><span class="hint">원하는 화면이 보이면 아래 버튼을 누르세요.</span></div>
-                      <button type="button" class="openbtn" id="doneLoginBtn">로그인 다 했어요</button>
-                      <button type="button" class="linkbtn" id="cancelLoginBtn">취소</button>
-                    </div>
-                  </div>
-                </div>
+                <p class="hint" style="margin-top:10px">여기서 바꾼 값은 <b>이번 검사에만</b> 쓰입니다. 계속 쓰려면 프로젝트 설정에서 저장하세요.</p>
               </div>
+
+              <div class="scansum" id="scanSum"></div>
 
               <div class="note bad" id="errNote"></div>
             </div>
@@ -553,66 +557,121 @@
             </div>
           </section>
 
-          <!-- 규칙 · 세부 설정 화면 -->
+          <!-- 프로젝트 설정 화면 -->
           <section class="card" id="rulesView" hidden>
             <div class="hd">
               <div>
-                <h2>규칙 · 세부 설정</h2>
-                <div class="hint">여기서 바꾼 값이 새 검사의 기본값이 됩니다. <b>서버에 저장되므로 접속한 모든 사람에게 같이 적용됩니다.</b></div>
+                <h2 id="pjTitle">프로젝트 설정</h2>
+                <div class="hint">이 프로젝트로 검사할 때 쓰는 주소·로그인·규칙입니다. <b>서버에 저장되므로 접속한 모든 사람에게 같이 적용됩니다.</b></div>
               </div>
               <div class="right"><span class="hint" id="rulesState"></span></div>
             </div>
 
             <div class="bd">
-              <h3 style="font-size:13px;font-weight:650;margin-bottom:10px">클릭하지 않을 단어</h3>
-              <p class="hint" style="margin-bottom:11px">이 단어가 이름·aria-label·title·id·class 어디에든 들어간 요소는 <b>클릭하지 않습니다.</b>
-                되돌릴 수 없는 동작을 막는 안전장치입니다.</p>
-              <div class="chips" id="ruleChips"></div>
-              <div class="chipadd">
-                <input id="ruleInput" placeholder="단어를 입력하고 Enter" spellcheck="false" aria-label="제외 단어 추가">
-                <button type="button" class="openbtn sm" id="ruleAdd">추가</button>
-              </div>
-              <div class="presets">
-                <span class="hint">빠른 설정</span>
-                <button type="button" class="preset" data-preset="basic" title="흔히 위험한 동작만 막습니다.">기본</button>
-                <button type="button" class="preset" data-preset="safe" title="되돌릴 수 없는 동작까지 폭넓게 막습니다. 운영·관리자 화면을 검사할 때 권장합니다.">안전 우선</button>
-                <button type="button" class="preset" data-preset="min" title="삭제·결제만 막습니다. 개발 환경에서 더 많은 요소를 검사하고 싶을 때 쓰세요.">최소</button>
+              <div class="setsec" id="pjNameSec">
+                <h3>이름</h3>
+                <label class="fld"><input id="pjName" maxlength="60" style="width:320px" aria-label="프로젝트 이름"></label>
               </div>
 
-              <hr style="border:0;border-top:1px solid var(--line-2);margin:22px 0">
-
-              <h3 style="font-size:13px;font-weight:650;margin-bottom:12px">검사 기본값</h3>
-              <div class="advgrid">
-                <label class="fld"><span>요소당 관찰 시간 (ms)</span><input id="setObserve" type="number" min="300" max="60000" step="100" style="width:130px"></label>
-                <label class="fld"><span>최대 페이지 수</span><input id="setMaxPages" type="number" min="1" max="1000" style="width:110px"></label>
-                <label class="fld"><span>기본 검사 범위</span>
-                  <select id="setScope" style="border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:13.5px;background:var(--card)">
-                    <option value="page">이 페이지만</option>
-                    <option value="path">하위 경로까지</option>
-                    <option value="domain">사이트 전체</option>
-                  </select>
-                </label>
+              <div class="setsec" id="pjUrlSec">
+                <h3>검사할 주소</h3>
+                <p class="hint" style="margin-bottom:11px">자주 검사하는 주소를 등록해 두면 새 검사 화면에서 눌러서 고를 수 있습니다.</p>
+                <div class="urlrows" id="urlRows"></div>
+                <button type="button" class="linkbtn" id="urlAdd">＋ 주소 추가</button>
               </div>
-              <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:14px">
-                <label class="chk" style="padding:0" title="새 창으로 열리는 링크를 눌러봅니다. 결제창처럼 새 창이 떠야 정상인 화면을 확인할 때 켜세요. 창은 열리자마자 닫습니다."><input type="checkbox" id="setNewTab"> 새 창 링크도 검사</label>
-                <label class="chk" style="padding:0" title="다른 사이트로 나가는 링크까지 눌러봅니다. 검사 시간이 늘고 외부 사이트에 접속하게 됩니다."><input type="checkbox" id="setExternal"> 외부 링크도 검사</label>
-                <label class="chk" style="padding:0" title="사내 개발 서버는 정식 인증서가 없어 브라우저가 '안전하지 않음' 경고를 띄웁니다. 켜두면 그 경고를 넘기고 검사합니다. 개발·사내 주소를 검사하려면 대부분 켜두어야 합니다."><input type="checkbox" id="setSSL"> 인증서 경고를 넘기고 검사</label>
+
+              <div class="setsec">
+                <h3>로그인</h3>
+                <div class="seg" id="authSeg" role="group" aria-label="로그인 방식" style="margin-bottom:13px">
+                  <button type="button" data-m="none" aria-pressed="true">로그인 없음</button>
+                  <button type="button" data-m="credentials" aria-pressed="false">아이디·비밀번호</button>
+                  <button type="button" data-m="session" aria-pressed="false">직접 로그인</button>
+                </div>
+
+                <div class="authpane" id="paneCred" hidden>
+                  <div class="credrow">
+                    <label class="fld"><span>로그인 주소</span><input id="loginUrl" placeholder="https://example.co.kr/login" style="min-width:260px"></label>
+                    <label class="fld"><span>아이디</span><input id="loginId" autocomplete="off" style="width:140px"></label>
+                    <label class="fld"><span>비밀번호</span><input id="loginPw" type="password" autocomplete="new-password" style="width:140px"></label>
+                    <label class="fld"><span>OTP <span class="opt">(있으면)</span></span><input id="loginOtp" autocomplete="off" placeholder="123123" style="width:150px"></label>
+                  </div>
+                  <div class="credrow">
+                    <button type="button" class="linkbtn" id="checkOtpBtn" title="OTP 칸에 실제로 어떤 값이 입력될지 미리 보여줍니다.">입력될 값 미리보기</button>
+                    <button type="button" class="linkbtn" id="clearPwBtn" hidden>저장된 비밀번호 지우기</button>
+                    <button type="button" class="linkbtn" id="clearOtpBtn" hidden>저장된 OTP 지우기</button>
+                    <span class="hint" id="credState"></span>
+                  </div>
+                  <p class="hint">OTP 칸에는 <b>넣을 값을 그대로</b> 적으면 됩니다. 개발 서버에서 <code>123123</code> 처럼 통하는 고정 코드가 있다면 그 값을 넣으세요.
+                    인증 앱을 쓴다면 앱 등록 화면의 비밀키를 넣으면 코드를 매번 새로 만들어 입력합니다. 문자·이메일로 받는 OTP는 <b>직접 로그인</b>을 쓰세요.</p>
+                  <div class="warnbox">
+                    <b>저장하면 접속한 다른 사람도 이 계정으로 검사를 돌릴 수 있습니다.</b><br>
+                    비밀번호와 OTP 값은 화면에 다시 보이지 않지만 검사에는 그대로 쓰입니다. 운영 계정 말고 <b>검사 전용 계정</b>을 쓰세요.
+                  </div>
+                </div>
+
+                <div class="authpane" id="paneSession" hidden>
+                  <div class="saved" id="savedBox" hidden>
+                    <span class="dot"></span>
+                    <div><b>로그인된 상태로 검사합니다</b><span class="hint" id="savedAt"></span></div>
+                    <button type="button" class="linkbtn" id="reloginBtn">다시 로그인</button>
+                    <button type="button" class="linkbtn" id="forgetBtn">로그인 지우기</button>
+                  </div>
+                  <div class="credrow" id="loginForm">
+                    <label class="fld"><span>로그인 주소</span><input id="sessionUrl" placeholder="https://example.co.kr/login" style="min-width:290px"></label>
+                    <button type="button" class="openbtn" id="openLoginBtn">로그인 창 열기</button>
+                    <p class="hint" style="width:100%" id="sessionHint"></p>
+                  </div>
+                  <div class="loginwait" id="loginWait" hidden>
+                    <span class="dot" style="background:var(--nr)"></span>
+                    <div><b>로그인 창에서 로그인하세요</b><span class="hint">원하는 화면이 보이면 아래 버튼을 누르세요.</span></div>
+                    <button type="button" class="openbtn" id="doneLoginBtn">로그인 다 했어요</button>
+                    <button type="button" class="linkbtn" id="cancelLoginBtn">취소</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setsec">
+                <h3>클릭하지 않을 단어</h3>
+                <p class="hint" style="margin-bottom:11px">이 단어가 이름·aria-label·title·id·class 어디에든 들어간 요소는 <b>클릭하지 않습니다.</b>
+                  되돌릴 수 없는 동작을 막는 안전장치입니다.</p>
+                <div class="chips" id="ruleChips"></div>
+                <div class="chipadd">
+                  <input id="ruleInput" placeholder="단어를 입력하고 Enter" spellcheck="false" aria-label="제외 단어 추가">
+                  <button type="button" class="openbtn sm" id="ruleAdd">추가</button>
+                </div>
+                <div class="presets">
+                  <span class="hint">빠른 설정</span>
+                  <button type="button" class="preset" data-preset="basic" title="흔히 위험한 동작만 막습니다.">기본</button>
+                  <button type="button" class="preset" data-preset="safe" title="되돌릴 수 없는 동작까지 폭넓게 막습니다. 운영·관리자 화면을 검사할 때 권장합니다.">안전 우선</button>
+                  <button type="button" class="preset" data-preset="min" title="삭제·결제만 막습니다. 개발 환경에서 더 많은 요소를 검사하고 싶을 때 쓰세요.">최소</button>
+                </div>
+              </div>
+
+              <div class="setsec">
+                <h3>검사 기본값</h3>
+                <div class="advgrid">
+                  <label class="fld"><span>요소당 관찰 시간 (ms)</span><input id="setObserve" type="number" min="300" max="60000" step="100" style="width:130px"></label>
+                  <label class="fld"><span>최대 페이지 수</span><input id="setMaxPages" type="number" min="1" max="1000" style="width:110px"></label>
+                  <label class="fld"><span>기본 검사 범위</span>
+                    <select id="setScope" style="border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:13.5px;background:var(--card)">
+                      <option value="page">이 페이지만</option>
+                      <option value="path">하위 경로까지</option>
+                      <option value="domain">사이트 전체</option>
+                    </select>
+                  </label>
+                </div>
+                <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:14px">
+                  <label class="chk" style="padding:0" title="새 창으로 열리는 링크를 눌러봅니다. 결제창처럼 새 창이 떠야 정상인 화면을 확인할 때 켜세요. 창은 열리자마자 닫습니다."><input type="checkbox" id="setNewTab"> 새 창 링크도 검사</label>
+                  <label class="chk" style="padding:0" title="다른 사이트로 나가는 링크까지 눌러봅니다. 검사 시간이 늘고 외부 사이트에 접속하게 됩니다."><input type="checkbox" id="setExternal"> 외부 링크도 검사</label>
+                  <label class="chk" style="padding:0" title="사내 개발 서버는 정식 인증서가 없어 브라우저가 '안전하지 않음' 경고를 띄웁니다. 켜두면 그 경고를 넘기고 검사합니다. 개발·사내 주소를 검사하려면 대부분 켜두어야 합니다."><input type="checkbox" id="setSSL"> 인증서 경고를 넘기고 검사</label>
+                </div>
               </div>
 
               <div class="rulefoot">
                 <button type="button" class="openbtn" id="saveRules">저장</button>
-                <button type="button" class="linkbtn" id="resetRules">기본값으로 되돌리기</button>
+                <button type="button" class="linkbtn" id="resetRules" title="클릭하지 않을 단어와 검사 기본값만 되돌립니다. 주소·로그인은 그대로 둡니다.">규칙을 기본값으로</button>
+                <button type="button" class="dangerbtn" id="deleteProject" hidden>프로젝트 삭제</button>
               </div>
-
-              <hr style="border:0;border-top:1px solid var(--line-2);margin:24px 0 20px">
-
-              <h3 style="font-size:13px;font-weight:650;margin-bottom:10px">저장된 로그인</h3>
-              <div class="warnbox" style="margin-bottom:12px">
-                <b>저장된 로그인은 이 서버에 접속한 누구나 쓸 수 있습니다.</b><br>
-                비밀번호·OTP 값이나 세션 쿠키가 화면에 보이지는 않지만, 검사를 실행하면 그 계정 권한으로 대상 화면의 버튼을 클릭합니다.
-                필요 없어지면 지워두세요.
-              </div>
-              <div id="authState"></div>
             </div>
           </section>
 
@@ -621,7 +680,7 @@
             <div class="hd">
               <div>
                 <h2>검사 이력</h2>
-                <div class="hint">서버에 <b>1년간</b> 보관합니다. 접속한 모든 사람이 같은 목록을 봅니다.</div>
+                <div class="hint"><b id="histProj"></b> 프로젝트의 기록입니다. 서버에 <b>1년간</b> 보관하며, 접속한 모든 사람이 같은 목록을 봅니다.</div>
               </div>
               <div class="right"><span class="hint" id="histCount"></span></div>
             </div>
@@ -772,7 +831,6 @@ $('moreBtn').addEventListener('click', () => {
   $('moreBtn').setAttribute('aria-expanded', String(open));
   $('moreBtn').textContent = open ? '세부 설정 접기' : '세부 설정';
 });
-$('loginOn').addEventListener('change', e => $('loginRow').classList.toggle('open', e.target.checked));
 $('url').addEventListener('keydown', e => { if (e.key === 'Enter') startScan(); });
 $('goBtn').addEventListener('click', startScan);
 $('stopBtn').addEventListener('click', stopScan);
@@ -784,7 +842,6 @@ $('homeBtn').addEventListener('click', () => {
   $('errNote').classList.remove('on');
   closeSide();
   navigate('dash');
-  loadHistory();
   loadHistory();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
@@ -854,147 +911,170 @@ fetch('/api/info').then(r => r.json()).then(info => {
   $('share').hidden = false;
 }).catch(() => {});
 
-/* ── 로그인 ── */
-let authMode = 'credentials';
-let hasSession = false, hasCred = false;
+/* ── 프로젝트 ──
+   검사 대상마다 주소·로그인·규칙을 따로 둔다. 선택한 프로젝트는 이 브라우저에 기억한다. */
+let PROJECTS = [], P = null;
+const PID_KEY = 'er.projectId';
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
-$('authSeg').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  authMode = b.dataset.m;
-  [...$('authSeg').children].forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-  $('paneCred').hidden = authMode !== 'credentials';
-  $('paneSession').hidden = authMode !== 'session';
-});
+function storedPid() { try { return localStorage.getItem(PID_KEY); } catch { return null; } }
+function storePid(id) { try { localStorage.setItem(PID_KEY, id); } catch {} }
+const fmtDate = iso => iso ? new Date(iso).toLocaleString('ko-KR') : '';
+const pidPath = () => `/api/projects/${encodeURIComponent(P.id)}`;
 
-function paintSession(info) {
-  hasSession = !!info.exists;
-  $('savedBox').hidden = !hasSession;
-  $('loginForm').hidden = hasSession;
-  $('loginWait').hidden = true;
-  if (hasSession) {
-    $('savedAt').textContent = (info.savedAt ? `${new Date(info.savedAt).toLocaleString('ko-KR')} 저장` : '') +
-      (info.url ? ` · ${info.url}` : '');
+async function loadProjects(selectId) {
+  try {
+    const list = await fetch('/api/projects').then(r => r.json());
+    PROJECTS = Array.isArray(list) ? list : [];
+  } catch { PROJECTS = []; }
+  const want = selectId || P?.id || storedPid() || 'quick';
+  const next = PROJECTS.find(x => x.id === want) || PROJECTS.find(x => x.quick) || PROJECTS[0] || null;
+  const changed = next?.id !== P?.id;
+  P = next;
+  paintProjects();
+  if (changed) onProjectChanged();
+  else { paintScanSummary(); paintUrlChips(); }
+}
+
+function paintProjects() {
+  $('projList').innerHTML = PROJECTS.map(x => `
+    <button type="button" class="projitem" data-id="${esc(x.id)}" aria-current="${x.id === P?.id}" title="${esc(x.name)}">
+      <span class="pdot"></span><span class="pn">${esc(x.name)}</span>
+      ${x.auth.mode === 'none' ? '' : `<span class="pk">${x.auth.mode === 'session' ? '세션' : '계정'}</span>`}
+    </button>`).join('');
+}
+
+/** 목록의 프로젝트 하나를 서버가 돌려준 최신 값으로 바꾼다 */
+function replaceProject(next) {
+  const i = PROJECTS.findIndex(x => x.id === next.id);
+  if (i >= 0) PROJECTS[i] = next;
+  if (P?.id === next.id) {
+    P = next;
+    // 주소 칸이 비어 있으면 방금 등록한 첫 주소를 넣어 둔다
+    if (!$('url').value.trim() && P.urls[0]) $('url').value = P.urls[0].url;
   }
+  paintProjects();
+  paintScanSummary();
+  paintUrlChips();
 }
 
-function paintCred(info) {
-  hasCred = !!info.exists;
-  $('forgetCredBtn').hidden = !hasCred;
-  if (!hasCred) { $('credState').textContent = ''; return; }
-  if (info.url && !$('loginUrl').value) $('loginUrl').value = info.url;
-  if (info.username && !$('loginId').value) $('loginId').value = info.username;
-  const bits = [];
-  if (info.hasPassword) bits.push('비밀번호');
-  if (info.hasOtp) bits.push('OTP');
-  $('credState').textContent =
-    `${bits.join('·')} 저장됨 (${new Date(info.savedAt).toLocaleString('ko-KR')}) — 값은 화면에 표시하지 않습니다`;
-  $('loginPw').placeholder = info.hasPassword ? '저장된 값 사용' : '';
-  $('loginOtp').placeholder = info.hasOtp ? '저장된 값 사용' : '123123';
+async function putProject(patch) {
+  const res = await fetch(pidPath(), { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(patch) });
+  const out = await res.json();
+  if (!res.ok) throw new Error(out.error || '저장하지 못했습니다');
+  replaceProject(out);
+  return out;
 }
 
-const loadSession = () => fetch('/api/session').then(r => r.json()).then(paintSession).catch(() => {});
-const loadCred = () => fetch('/api/credentials').then(r => r.json()).then(paintCred).catch(() => {});
-loadSession(); loadCred();
+$('projList').addEventListener('click', e => {
+  const b = e.target.closest('.projitem');
+  if (!b || b.dataset.id === P?.id) return;
+  if (running) { toast('검사가 끝난 뒤 프로젝트를 바꿀 수 있습니다'); return; }
+  P = PROJECTS.find(x => x.id === b.dataset.id);
+  paintProjects();
+  onProjectChanged();
+});
 
-$('saveCredBtn').addEventListener('click', async () => {
-  const body = {
-    url: $('loginUrl').value.trim(),
-    username: $('loginId').value.trim(),
-    password: $('loginPw').value,
-    otp: $('loginOtp').value.trim(),
-  };
-  if (!body.url || !body.username) { toast('로그인 주소와 아이디를 입력하세요'); return; }
-  if (!confirm(
-    '서버에 계정 정보를 저장합니다.\n\n' +
-    '이 서버에 접속한 다른 사람도 이 계정으로 검사를 실행할 수 있습니다. ' +
-    '비밀번호와 OTP 값 자체는 화면에 표시되지 않지만, 검사에는 그대로 쓰입니다.\n\n' +
-    '운영 계정이 아닌 검사 전용 계정인지 확인하셨나요?')) return;
+/** 프로젝트를 바꾸면 새 검사 폼·이력·설정 화면이 모두 그 프로젝트 기준으로 바뀐다 */
+function onProjectChanged() {
+  if (!P) return;
+  storePid(P.id);
+  hasResult = false;
+  $('errNote').classList.remove('on');
+  closeSide();
+  $('url').value = P.urls[0]?.url || '';
+  applyDefaultsToForm();
+  paintUrlChips();
+  paintScanSummary();
+  loadHistory();
+  if (view === 'rules') fillProjectForm();
+  paintView();
+}
+
+$('projAddBtn').addEventListener('click', () => {
+  $('projAddForm').hidden = false;
+  $('projAddName').value = '';
+  $('projAddName').focus();
+});
+$('projAddName').addEventListener('keydown', e => { if (e.key === 'Escape') $('projAddForm').hidden = true; });
+$('projAddName').addEventListener('blur', () => { if (!$('projAddName').value.trim()) $('projAddForm').hidden = true; });
+$('projAddForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('projAddName').value.trim();
+  if (!name) return;
+  if (running) { toast('검사가 끝난 뒤 만들 수 있습니다'); return; }
   try {
-    const res = await fetch('/api/credentials', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    const res = await fetch('/api/projects', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ name, copyFrom: P?.id }),
     });
     const out = await res.json();
     if (!res.ok) throw new Error(out.error);
-    $('loginPw').value = ''; $('loginOtp').value = '';
-    await loadCred();
-    toast('서버에 저장했습니다');
-  } catch (e) { toast(e.message || '저장하지 못했습니다'); }
+    $('projAddForm').hidden = true;
+    await loadProjects(out.id);
+    navigate('rules');
+    toast(`"${out.name}" 프로젝트를 만들었습니다. 주소와 로그인을 설정하세요`);
+  } catch (err) { toast(err.message || '프로젝트를 만들지 못했습니다'); }
 });
 
-$('checkOtpBtn').addEventListener('click', async () => {
-  try {
-    const res = await fetch('/api/otp/check', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ otp: $('loginOtp').value.trim() }),
-    });
-    const out = await res.json();
-    if (!res.ok) throw new Error(out.error);
-    toast(out.kind === 'fixed'
-      ? `입력한 값 그대로 "${out.code}" 을 넣습니다`
-      : `비밀키로 만든 코드는 ${out.code} 입니다 (${out.secondsLeft}초 남음). 인증 앱과 같은지 확인하세요`);
-  } catch (e) { toast(e.message || 'OTP 코드를 만들지 못했습니다'); }
+/* 새 검사 폼 — 등록된 주소를 눌러 고른다 */
+function paintUrlChips() {
+  const urls = P?.urls || [];
+  $('urlChips').hidden = !urls.length;
+  const cur = $('url').value.trim();
+  $('urlChips').innerHTML = '<span class="hint" style="display:inline">등록된 주소</span>' + urls.map(u =>
+    `<button type="button" class="urlchip" data-url="${esc(u.url)}" aria-pressed="${u.url === cur}" title="${esc(u.url)}">${esc(u.label || u.url)}</button>`
+  ).join('');
+}
+$('urlChips').addEventListener('click', e => {
+  const b = e.target.closest('.urlchip'); if (!b) return;
+  $('url').value = b.dataset.url;
+  paintUrlChips();
 });
+$('url').addEventListener('input', paintUrlChips);
 
-$('forgetCredBtn').addEventListener('click', async () => {
-  if (!confirm('저장된 계정 정보를 지울까요?')) return;
-  await fetch('/api/credentials', { method: 'DELETE' }).catch(() => {});
-  $('loginPw').value = ''; $('loginOtp').value = '';
-  await loadCred();
-  toast('저장된 계정 정보를 지웠습니다');
-});
+/** 이 프로젝트로 검사하면 무엇이 적용되는지 폼 아래에 한 줄로 밝힌다 */
+function paintScanSummary() {
+  if (!P) return;
+  $('projBadge').textContent = P.name;
+  const a = P.auth, r = P.rules;
+  const auth =
+    a.mode === 'credentials'
+      ? (a.url && a.username && a.hasPassword
+          ? `<b>${esc(a.username)}</b> 계정으로 로그인${a.hasOtp ? ' (OTP 포함)' : ''}`
+          : '<span class="warn">로그인 계정이 비어 있습니다</span>')
+    : a.mode === 'session'
+      ? (P.session.exists
+          ? `<b>저장된 로그인</b> 사용 <span class="opt">(${esc(fmtDate(P.session.savedAt))})</span>`
+          : '<span class="warn">저장된 로그인이 없습니다</span>')
+    : '로그인 없이 검사';
+  $('scanSum').innerHTML =
+    `<span>${auth}</span>` +
+    `<span>제외 단어 <b>${r.excludeRules.length}</b>개</span>` +
+    `<span>관찰 <b>${r.observeMs}</b>ms</span>` +
+    `<span>최대 <b>${r.maxPages}</b>페이지</span>` +
+    `<button type="button" class="linkbtn" data-go="rules">프로젝트 설정 →</button>`;
+}
+$('scanSum').addEventListener('click', e => { if (e.target.closest('[data-go]')) navigate('rules'); });
 
-$('openLoginBtn').addEventListener('click', async () => {
-  const url = $('sessionUrl').value.trim() || $('loginUrl').value.trim() || $('url').value.trim();
-  if (!url) { toast('로그인 주소를 입력하세요'); $('sessionUrl').focus(); return; }
-  $('openLoginBtn').disabled = true;
-  $('openLoginBtn').textContent = '창을 여는 중…';
-  try {
-    const res = await fetch('/api/session/open', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }),
-    });
-    const out = await res.json();
-    if (!res.ok) throw new Error(out.error);
-    $('loginForm').hidden = true;
-    $('loginWait').hidden = false;
-  } catch (e) { toast(e.message || '로그인 창을 열지 못했습니다'); }
-  finally { $('openLoginBtn').disabled = false; $('openLoginBtn').textContent = '로그인 창 열기'; }
-});
-
-$('doneLoginBtn').addEventListener('click', async () => {
-  if (!confirm(
-    '로그인한 상태를 서버에 저장합니다.\n\n' +
-    '이 서버에 접속한 다른 사람도 이 로그인 상태로 검사를 실행할 수 있습니다.\n\n' +
-    '계속할까요?')) return;
-  $('doneLoginBtn').disabled = true;
-  try {
-    const res = await fetch('/api/session/save', { method: 'POST' });
-    const out = await res.json();
-    if (!res.ok) throw new Error(out.error);
-    await loadSession();
-    toast(`로그인을 저장했습니다 (쿠키 ${out.cookies}개)`);
-  } catch (e) { toast(e.message || '저장하지 못했습니다'); }
-  finally { $('doneLoginBtn').disabled = false; }
-});
-
-$('cancelLoginBtn').addEventListener('click', async () => {
-  await fetch('/api/session/cancel', { method: 'POST' }).catch(() => {});
-  $('loginWait').hidden = true; $('loginForm').hidden = false;
-});
-
-$('reloginBtn').addEventListener('click', () => { $('savedBox').hidden = true; $('loginForm').hidden = false; });
-
-$('forgetBtn').addEventListener('click', async () => {
-  if (!confirm('저장된 로그인을 지울까요?')) return;
-  await fetch('/api/session', { method: 'DELETE' }).catch(() => {});
-  await loadSession();
-  $('loginForm').hidden = false;
-  toast('저장된 로그인을 지웠습니다');
-});
+/** 로그인 준비가 안 됐으면 그 이유 */
+function authProblem() {
+  const a = P?.auth || {};
+  if (a.mode === 'credentials' && !(a.url && a.username && a.hasPassword)) {
+    return '이 프로젝트의 로그인 계정이 비어 있습니다. 프로젝트 설정에서 입력하세요';
+  }
+  if (a.mode === 'session' && !P.session.exists) {
+    return '이 프로젝트에 저장된 로그인이 없습니다. 프로젝트 설정에서 로그인 창을 열어 로그인하세요';
+  }
+  return null;
+}
 
 /* ── 스캔 ── */
 async function startScan() {
   const url = $('url').value.trim();
   if (!url) { toast('검사할 주소를 입력하세요'); $('url').focus(); return; }
+  if (!P) { toast('프로젝트를 불러오지 못했습니다. 새로고침해 주세요'); return; }
+  const problem = authProblem();
+  if (problem) { toast(problem); navigate('rules'); return; }
 
   const excludeRules = $('excl').value.split(',').map(s => s.trim()).filter(Boolean);
   if (!excludeRules.length) {
@@ -1015,7 +1095,7 @@ async function startScan() {
   $('pfill').style.width = '0%';
   view = 'dash'; hasResult = false; running = true;
   paintView();
-  $('crumb').innerHTML = 'Dashboard / <b>검사 진행 중</b>';
+  $('crumb').innerHTML = `${esc(P.name)} / <b>검사 진행 중</b>`;
   paintLive();
   $('goBtn').disabled = true;
   $('stopBtn').hidden = false;
@@ -1027,34 +1107,11 @@ async function startScan() {
     $('runElapsed').textContent = `경과 ${((Date.now() - startedAt) / 1000).toFixed(1)}s`;
   }, 100);
 
-  let mode = 'none', login = null;
-  if ($('loginOn').checked) {
-    mode = authMode;
-    if (mode === 'session' && !hasSession) {
-      toast('먼저 로그인 창을 열어 로그인해 주세요');
-      $('adv').classList.add('open'); $('loginRow').classList.add('open');
-      return;
-    }
-    if (mode === 'credentials') {
-      login = {
-        url: $('loginUrl').value.trim(),
-        username: $('loginId').value.trim(),
-        password: $('loginPw').value,
-        otp: $('loginOtp').value.trim(),
-      };
-      if (!login.url || !login.username || (!login.password && !hasCred)) {
-        toast('로그인 주소·아이디·비밀번호를 입력하세요');
-        $('adv').classList.add('open'); $('loginRow').classList.add('open');
-        return;
-      }
-    }
-  }
-
   try {
     const res = await fetch('/api/scan', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        url, scope, authMode: mode, login,
+        url, projectId: P.id, scope,
         excludeRules,
         observeMs: Number($('observeMs').value) || 2000,
         maxPages: Number($('maxPages').value) || 50,
@@ -1289,6 +1346,7 @@ function rescan(entry) {
   const target = src?.url || META.url;
   if (!target) return;
   $('url').value = target;
+  paintUrlChips();
   const st = src?.settings;
   if (st) {
     if (st.scope) {
@@ -1300,14 +1358,6 @@ function rescan(entry) {
     if (Array.isArray(st.excludeRules)) $('excl').value = st.excludeRules.join(', ');
     $('clickNewTab').checked = !!st.clickNewTab;
     $('clickExternal').checked = !!st.clickExternal;
-    if (st.authMode && st.authMode !== 'none') {
-      $('loginOn').checked = true;
-      $('loginRow').classList.add('open');
-      authMode = st.authMode;
-      [...$('authSeg').children].forEach(x => x.setAttribute('aria-pressed', String(x.dataset.m === authMode)));
-      $('paneCred').hidden = authMode !== 'credentials';
-      $('paneSession').hidden = authMode !== 'session';
-    }
   }
   // 결과 화면을 닫고 새 검사 폼을 보여준다
   hasResult = false;
@@ -1322,8 +1372,10 @@ function rescan(entry) {
 let HISTORY = [];
 
 function loadHistory() {
-  return fetch('/api/history').then(r => r.json()).then(list => {
+  if (!P) return Promise.resolve();
+  return fetch('/api/history?projectId=' + encodeURIComponent(P.id)).then(r => r.json()).then(list => {
     HISTORY = Array.isArray(list) ? list : [];
+    if (view === 'history') renderHistoryView();
     if (!HISTORY.length) { $('weekBox').hidden = true; paintView(); return; }
     $('histList').innerHTML = HISTORY.slice(0, 5).map((h, i) => `
       <tr>
@@ -1375,8 +1427,7 @@ function loadRunner() {
     $('runnerInfo').innerHTML = [
       ['브라우저', info.browser],
       ['뷰포트', info.viewport],
-      ['기본 관찰 시간', info.observeMs + 'ms'],
-      ['최대 페이지', info.maxPages],
+      ['프로젝트', info.projects + '개'],
       ['상태', info.state],
       ['ER', 'v' + info.version],
     ].map(([k, v]) => `<div class="kvrow"><dt>${k}</dt><dd>${esc(String(v))}</dd></div>`).join('');
@@ -1385,26 +1436,28 @@ function loadRunner() {
   }).catch(() => {});
 }
 loadRunner();
-loadHistory();
+loadProjects();
 
 /**
  * 서버에 화면이 없으면 "직접 로그인" 창을 띄워도 아무도 볼 수 없다.
  * 그런 환경에서는 그 방법을 권하지 않고, 왜 못 쓰는지 밝힌다.
  */
+let WIN = { canOpen: true, host: '' };
 function paintWindowSupport(canOpen, host) {
+  WIN = { canOpen, host };
   const btn = $('openLoginBtn');
   const hint = $('sessionHint');
   if (canOpen) {
     btn.disabled = false;
     hint.innerHTML = `로그인 창이 <b>서버가 실행 중인 컴퓨터(${esc(host || '')}) 화면</b>에 뜹니다. ` +
       `그 컴퓨터 앞에 있는 사람이 직접 로그인하면 OTP·SSO 무엇이든 통과할 수 있습니다.<br>` +
-      `<b>로그인한 상태가 서버에 저장되어, 접속한 다른 사람도 그 상태로 검사를 돌릴 수 있습니다.</b>`;
+      `<b>로그인한 상태가 이 프로젝트에 저장되어, 접속한 다른 사람도 그 상태로 검사를 돌릴 수 있습니다.</b>`;
   } else {
     btn.disabled = true;
     hint.innerHTML = `<b>이 서버에는 화면이 없어 이 방법을 쓸 수 없습니다.</b> ` +
       `로그인 창을 띄워도 볼 수 있는 사람이 없기 때문입니다.<br>` +
       `아이디·비밀번호 방식을 쓰시거나, 화면이 있는 컴퓨터에서 ER 을 실행해 로그인 상태를 만든 뒤 ` +
-      `<code>auth.local.json</code> 파일을 서버로 옮기세요.`;
+      `<code>data/sessions/${esc(P?.id || '프로젝트ID')}.json</code> 파일을 서버의 같은 위치로 옮기세요.`;
   }
 }
 
@@ -1433,14 +1486,14 @@ function paintView() {
   $('distBox').hidden = $('out').hidden;
   $('cmpBox').hidden = $('out').hidden || !$('cmpBox').dataset.ready;
 
-  const title = { dash: hasResult ? '검사 결과' : '새 검사', history: '검사 이력', rules: '규칙 · 세부 설정' }[view];
-  $('crumb').innerHTML = `Dashboard / <b>${title}</b>`;
+  const title = { dash: hasResult ? '검사 결과' : '새 검사', history: '검사 이력', rules: '프로젝트 설정' }[view];
+  $('crumb').innerHTML = `${esc(P?.name || 'ER')} / <b>${title}</b>`;
 }
 
 function navigate(to) {
   view = to;
   if (to === 'history') renderHistoryView();
-  if (to === 'rules') loadSettings();
+  if (to === 'rules') fillProjectForm();
   paintView();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1451,15 +1504,187 @@ document.querySelector('.navlist').addEventListener('click', e => {
 });
 $('seeAllHist').addEventListener('click', () => navigate('history'));
 
-/* ── 규칙 · 세부 설정 ── */
+/* ── 프로젝트 설정 ── */
 const PRESETS = {
   basic: ['삭제', '탈퇴', '결제', '로그아웃', '구매', '주문'],
   safe: ['삭제', '탈퇴', '결제', '로그아웃', '구매', '주문', '발송', '전송', '승인', '반려',
          '확정', '정산', '환불', '마감', '배포', '복구', '동기화'],
   min: ['삭제', '결제'],
 };
-let RULES = [];
+let RULES = [], URLS = [], AUTH_MODE = 'none';
 
+/** 지금 프로젝트의 저장된 값으로 설정 화면을 채운다 (저장 안 한 입력은 버린다) */
+function fillProjectForm() {
+  if (!P) return;
+  $('pjTitle').textContent = P.quick ? '프로젝트 설정 — 빠른 검사' : `프로젝트 설정 — ${P.name}`;
+  $('pjNameSec').hidden = P.quick;
+  $('pjName').value = P.name;
+
+  URLS = P.urls.map(u => ({ ...u }));
+  paintUrlRows();
+
+  setAuthMode(P.auth.mode);
+  $('loginUrl').value = $('sessionUrl').value = P.auth.url || '';
+  $('loginId').value = P.auth.username || '';
+  $('loginPw').value = '';
+  $('loginOtp').value = '';
+  paintCredState();
+  paintSession();
+  paintWindowSupport(WIN.canOpen, WIN.host);
+
+  const r = P.rules;
+  RULES = [...r.excludeRules];
+  paintChips();
+  $('setObserve').value = r.observeMs;
+  $('setMaxPages').value = r.maxPages;
+  $('setScope').value = r.scope;
+  $('setNewTab').checked = !!r.clickNewTab;
+  $('setExternal').checked = !!r.clickExternal;
+  $('setSSL').checked = r.ignoreHTTPSErrors !== false;
+
+  $('deleteProject').hidden = P.quick;
+  $('rulesState').textContent = P.updatedAt ? `마지막 저장 ${fmtDate(P.updatedAt)}` : '';
+}
+
+/* 주소 목록 */
+function paintUrlRows() {
+  $('urlRows').innerHTML = URLS.length
+    ? URLS.map((u, i) => `<div class="row">
+        <input class="lb" data-i="${i}" data-k="label" value="${esc(u.label)}" placeholder="이름 (예: 주문 관리)" aria-label="주소 이름">
+        <input class="u" data-i="${i}" data-k="url" value="${esc(u.url)}" placeholder="https://" spellcheck="false" aria-label="주소">
+        <button type="button" class="x" data-del="${i}" aria-label="이 주소 빼기">×</button>
+      </div>`).join('')
+    : '<span class="hint">등록된 주소가 없습니다.</span>';
+}
+$('urlRows').addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.i === undefined) return;
+  URLS[Number(t.dataset.i)][t.dataset.k] = t.value;
+});
+$('urlRows').addEventListener('click', e => {
+  const b = e.target.closest('[data-del]'); if (!b) return;
+  URLS.splice(Number(b.dataset.del), 1);
+  paintUrlRows();
+});
+$('urlAdd').addEventListener('click', () => {
+  URLS.push({ label: '', url: '' });
+  paintUrlRows();
+  $('urlRows').querySelector('.row:last-child .lb')?.focus();
+});
+
+/* 로그인 방식 */
+function setAuthMode(m) {
+  AUTH_MODE = m;
+  [...$('authSeg').children].forEach(x => x.setAttribute('aria-pressed', String(x.dataset.m === m)));
+  $('paneCred').hidden = m !== 'credentials';
+  $('paneSession').hidden = m !== 'session';
+}
+$('authSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  setAuthMode(b.dataset.m);
+});
+// 로그인 주소는 두 방식이 같은 값을 쓴다
+$('loginUrl').addEventListener('input', () => { $('sessionUrl').value = $('loginUrl').value; });
+$('sessionUrl').addEventListener('input', () => { $('loginUrl').value = $('sessionUrl').value; });
+
+function paintCredState() {
+  const a = P.auth;
+  $('clearPwBtn').hidden = !a.hasPassword;
+  $('clearOtpBtn').hidden = !a.hasOtp;
+  $('loginPw').placeholder = a.hasPassword ? '저장된 값 사용' : '';
+  $('loginOtp').placeholder = a.hasOtp ? '저장된 값 사용' : '123123';
+  const bits = [a.hasPassword && '비밀번호', a.hasOtp && 'OTP'].filter(Boolean);
+  $('credState').textContent = bits.length
+    ? `${bits.join('·')} 저장됨 — 값은 화면에 표시하지 않습니다. 바꿀 때만 새로 입력하세요`
+    : '';
+}
+
+async function clearSecret(flag, what) {
+  if (!confirm(`저장된 ${what}을(를) 지울까요?`)) return;
+  try {
+    await putProject({ auth: { [flag]: true } });
+    paintCredState();
+    toast(`저장된 ${what}을(를) 지웠습니다`);
+  } catch (e) { toast(e.message); }
+}
+$('clearPwBtn').addEventListener('click', () => clearSecret('clearPassword', '비밀번호'));
+$('clearOtpBtn').addEventListener('click', () => clearSecret('clearOtp', 'OTP'));
+
+$('checkOtpBtn').addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/otp/check', {
+      method: 'POST', headers: JSON_HEADERS,
+      body: JSON.stringify({ otp: $('loginOtp').value.trim(), projectId: P.id }),
+    });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error);
+    toast(out.kind === 'fixed'
+      ? `입력한 값 그대로 "${out.code}" 을 넣습니다`
+      : `비밀키로 만든 코드는 ${out.code} 입니다 (${out.secondsLeft}초 남음). 인증 앱과 같은지 확인하세요`);
+  } catch (e) { toast(e.message || 'OTP 코드를 만들지 못했습니다'); }
+});
+
+/* 직접 로그인 */
+function paintSession() {
+  const st = P.session || {};
+  $('savedBox').hidden = !st.exists;
+  $('loginForm').hidden = !!st.exists;
+  $('loginWait').hidden = true;
+  if (st.exists) $('savedAt').textContent = `${fmtDate(st.savedAt)} 저장` + (st.url ? ` · ${st.url}` : '');
+}
+
+$('openLoginBtn').addEventListener('click', async () => {
+  const url = $('sessionUrl').value.trim() || P.urls[0]?.url || '';
+  if (!url) { toast('로그인 주소를 입력하세요'); $('sessionUrl').focus(); return; }
+  $('openLoginBtn').disabled = true;
+  $('openLoginBtn').textContent = '창을 여는 중…';
+  try {
+    const res = await fetch(`${pidPath()}/session/open`, {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ url }),
+    });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error);
+    $('loginForm').hidden = true;
+    $('loginWait').hidden = false;
+  } catch (e) { toast(e.message || '로그인 창을 열지 못했습니다'); }
+  finally { $('openLoginBtn').disabled = !WIN.canOpen; $('openLoginBtn').textContent = '로그인 창 열기'; }
+});
+
+$('doneLoginBtn').addEventListener('click', async () => {
+  if (!confirm(
+    `로그인한 상태를 "${P.name}" 프로젝트에 저장합니다.\n\n` +
+    '이 서버에 접속한 다른 사람도 이 로그인 상태로 검사를 실행할 수 있습니다.\n\n' +
+    '계속할까요?')) return;
+  $('doneLoginBtn').disabled = true;
+  try {
+    const res = await fetch(`${pidPath()}/session/save`, { method: 'POST' });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error);
+    // 로그인을 저장했다는 것은 이 방식으로 검사하겠다는 뜻이다
+    await putProject({ auth: { mode: 'session' } });
+    setAuthMode('session');
+    paintSession();
+    toast(`로그인을 저장했습니다 (쿠키 ${out.cookies}개)`);
+  } catch (e) { toast(e.message || '저장하지 못했습니다'); }
+  finally { $('doneLoginBtn').disabled = false; }
+});
+
+$('cancelLoginBtn').addEventListener('click', async () => {
+  await fetch('/api/session/cancel', { method: 'POST' }).catch(() => {});
+  $('loginWait').hidden = true; $('loginForm').hidden = false;
+});
+
+$('reloginBtn').addEventListener('click', () => { $('savedBox').hidden = true; $('loginForm').hidden = false; });
+
+$('forgetBtn').addEventListener('click', async () => {
+  if (!confirm('이 프로젝트에 저장된 로그인을 지울까요?')) return;
+  await fetch(`${pidPath()}/session`, { method: 'DELETE' }).catch(() => {});
+  await loadProjects();
+  paintSession();
+  toast('저장된 로그인을 지웠습니다');
+});
+
+/* 클릭하지 않을 단어 */
 function paintChips() {
   $('ruleChips').innerHTML = RULES.length
     ? RULES.map((w, i) => `<span class="chip">${esc(w)}<button type="button" data-i="${i}" aria-label="${esc(w)} 제거">×</button></span>`).join('')
@@ -1489,102 +1714,95 @@ document.querySelector('.presets').addEventListener('click', e => {
   toast('빠른 설정을 적용했습니다. 저장을 눌러야 반영됩니다');
 });
 
-function loadSettings() {
-  return fetch('/api/settings').then(r => r.json()).then(cfg => {
-    RULES = [...(cfg.excludeRules || [])];
-    paintChips();
-    $('setObserve').value = cfg.observeMs;
-    $('setMaxPages').value = cfg.maxPages;
-    $('setScope').value = cfg.scope;
-    $('setNewTab').checked = !!cfg.clickNewTab;
-    $('setExternal').checked = !!cfg.clickExternal;
-    $('setSSL').checked = cfg.ignoreHTTPSErrors !== false;
-    $('rulesState').textContent = cfg.changed ? '기본값에서 바뀐 설정입니다' : '기본값을 쓰고 있습니다';
-    paintAuthState();
-    return cfg;
-  }).catch(() => {});
-}
-
+/* 저장 — 이름·주소·로그인·규칙을 한 번에 */
 $('saveRules').addEventListener('click', async () => {
-  const body = {
-    observeMs: Number($('setObserve').value),
-    maxPages: Number($('setMaxPages').value),
-    scope: $('setScope').value,
-    excludeRules: RULES,
-    clickNewTab: $('setNewTab').checked,
-    clickExternal: $('setExternal').checked,
-    ignoreHTTPSErrors: $('setSSL').checked,
+  const urls = URLS.map(u => ({ ...u, label: u.label.trim(), url: u.url.trim() })).filter(u => u.url);
+  const badUrl = urls.find(u => !/^https?:\/\//i.test(u.url));
+  if (badUrl) { toast(`주소는 http:// 또는 https:// 로 시작해야 합니다 — ${badUrl.url}`); return; }
+
+  const auth = {
+    mode: AUTH_MODE,
+    url: $('loginUrl').value.trim(),
+    username: $('loginId').value.trim(),
+    password: $('loginPw').value,
+    otp: $('loginOtp').value.trim(),
   };
+  if (AUTH_MODE === 'credentials') {
+    if (!auth.url || !auth.username || (!auth.password && !P.auth.hasPassword)) {
+      toast('로그인 주소·아이디·비밀번호를 입력하세요'); return;
+    }
+    if ((auth.password || auth.otp) && !confirm(
+      '서버에 계정 정보를 저장합니다.\n\n' +
+      '이 서버에 접속한 다른 사람도 이 계정으로 검사를 실행할 수 있습니다. ' +
+      '비밀번호와 OTP 값 자체는 화면에 표시되지 않지만, 검사에는 그대로 쓰입니다.\n\n' +
+      '운영 계정이 아닌 검사 전용 계정인지 확인하셨나요?')) return;
+  }
+
+  const body = {
+    urls, auth,
+    rules: {
+      observeMs: Number($('setObserve').value),
+      maxPages: Number($('setMaxPages').value),
+      scope: $('setScope').value,
+      excludeRules: RULES,
+      clickNewTab: $('setNewTab').checked,
+      clickExternal: $('setExternal').checked,
+      ignoreHTTPSErrors: $('setSSL').checked,
+    },
+  };
+  if (!P.quick) body.name = $('pjName').value.trim();
+
   try {
-    const res = await fetch('/api/settings', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    });
-    const out = await res.json();
-    if (!res.ok) throw new Error(out.error);
-    await loadSettings();
+    await putProject(body);
+    fillProjectForm();
     applyDefaultsToForm();
     toast('저장했습니다. 다음 검사부터 적용됩니다');
   } catch (e) { toast(e.message || '저장하지 못했습니다'); }
 });
 
 $('resetRules').addEventListener('click', async () => {
-  if (!confirm('검사 기본값을 처음 상태로 되돌릴까요?')) return;
-  await fetch('/api/settings', { method: 'DELETE' }).catch(() => {});
-  await loadSettings();
-  applyDefaultsToForm();
-  toast('기본값으로 되돌렸습니다');
+  if (!confirm('클릭하지 않을 단어와 검사 기본값을 처음 상태로 되돌릴까요?\n주소·로그인은 그대로 둡니다.')) return;
+  try {
+    const res = await fetch(`${pidPath()}/reset-rules`, { method: 'POST' });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error);
+    replaceProject(out);
+    fillProjectForm();
+    applyDefaultsToForm();
+    toast('규칙을 기본값으로 되돌렸습니다');
+  } catch (e) { toast(e.message || '되돌리지 못했습니다'); }
 });
 
-/** 저장된 설정을 새 검사 폼의 초기값으로 옮긴다 */
-function applyDefaultsToForm() {
-  return fetch('/api/settings').then(r => r.json()).then(cfg => {
-    $('observeMs').value = cfg.observeMs;
-    $('maxPages').value = cfg.maxPages;
-    $('excl').value = (cfg.excludeRules || []).join(', ');
-    $('clickNewTab').checked = !!cfg.clickNewTab;
-    $('clickExternal').checked = !!cfg.clickExternal;
-    scope = cfg.scope || 'path';
-    [...$('scopeSeg').children].forEach(x => x.setAttribute('aria-pressed', String(x.dataset.s === scope)));
-  }).catch(() => {});
-}
-applyDefaultsToForm();
+$('deleteProject').addEventListener('click', async () => {
+  if (!confirm(`"${P.name}" 프로젝트를 지울까요?\n\n` +
+    '저장된 계정과 로그인도 함께 지워집니다. 검사 기록과 리포트는 남습니다.')) return;
+  try {
+    const res = await fetch(pidPath(), { method: 'DELETE' });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error);
+    const name = P.name;
+    await loadProjects('quick');
+    navigate('dash');
+    toast(`"${name}" 프로젝트를 지웠습니다`);
+  } catch (e) { toast(e.message || '지우지 못했습니다'); }
+});
 
-/** 저장된 로그인 상태를 규칙 화면에서도 확인·정리할 수 있게 한다 */
-function paintAuthState() {
-  Promise.all([
-    fetch('/api/credentials').then(r => r.json()).catch(() => ({})),
-    fetch('/api/session').then(r => r.json()).catch(() => ({})),
-  ]).then(([cred, sess]) => {
-    const rows = [];
-    rows.push(`<div class="authline">
-      <span class="nm">아이디·비밀번호</span>
-      <span class="st">${cred.exists
-        ? `${esc(cred.username || '')} · ${cred.hasPassword ? '비밀번호' : ''}${cred.hasOtp ? '·OTP' : ''} 저장됨 (${new Date(cred.savedAt).toLocaleString('ko-KR')})`
-        : '저장된 계정이 없습니다'}</span>
-      ${cred.exists ? '<button type="button" class="linkbtn" data-clear="cred">지우기</button>' : ''}
-    </div>`);
-    rows.push(`<div class="authline">
-      <span class="nm">직접 로그인 세션</span>
-      <span class="st">${sess.exists
-        ? `${new Date(sess.savedAt).toLocaleString('ko-KR')} 저장 · ${esc(sess.url || '')}`
-        : '저장된 세션이 없습니다'}</span>
-      ${sess.exists ? '<button type="button" class="linkbtn" data-clear="session">지우기</button>' : ''}
-    </div>`);
-    $('authState').innerHTML = rows.join('');
-    $('authState').onclick = async e => {
-      const b = e.target.closest('button[data-clear]'); if (!b) return;
-      const what = b.dataset.clear;
-      if (!confirm(what === 'cred' ? '저장된 계정 정보를 지울까요?' : '저장된 로그인 세션을 지울까요?')) return;
-      await fetch(what === 'cred' ? '/api/credentials' : '/api/session', { method: 'DELETE' }).catch(() => {});
-      paintAuthState();
-      if (what === 'cred') loadCred(); else loadSession();
-      toast('지웠습니다');
-    };
-  });
+/** 프로젝트 규칙을 새 검사 폼의 초기값으로 옮긴다 */
+function applyDefaultsToForm() {
+  if (!P) return;
+  const r = P.rules;
+  $('observeMs').value = r.observeMs;
+  $('maxPages').value = r.maxPages;
+  $('excl').value = r.excludeRules.join(', ');
+  $('clickNewTab').checked = !!r.clickNewTab;
+  $('clickExternal').checked = !!r.clickExternal;
+  scope = r.scope || 'path';
+  [...$('scopeSeg').children].forEach(x => x.setAttribute('aria-pressed', String(x.dataset.s === scope)));
 }
 
 /** 검사 이력 화면 — 대시보드 요약보다 자세히 보여준다 */
 function renderHistoryView() {
+  $('histProj').textContent = P?.name || '';
   const SCOPE = { page: '이 페이지만', path: '하위 경로까지', domain: '사이트 전체' };
   if (!HISTORY.length) {
     $('historyList').innerHTML = '';
