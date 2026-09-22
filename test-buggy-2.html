@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>버그 데모 — 회원 설정</title>
+<style>
+  body{font-family:system-ui,-apple-system,'Malgun Gothic',sans-serif;margin:0;color:#1a1d26;background:#f5f6f8}
+  header{background:#1f2937;color:#fff;padding:14px 28px;display:flex;gap:18px;align-items:center}
+  header b{font-size:16px}
+  main{max-width:820px;margin:24px auto;padding:0 20px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:18px 20px;margin-bottom:16px}
+  .card h2{font-size:14px;margin:0 0 12px;color:#374151}
+  label{display:block;font-size:13px;margin:8px 0 4px;color:#4b5563}
+  input{font:inherit;padding:7px 10px;border:1px solid #d6dae2;border-radius:6px;width:260px}
+  button,a.btn{font:inherit;font-size:14px;padding:8px 14px;margin:12px 6px 0 0;border:1px solid #d6dae2;background:#fff;border-radius:7px;cursor:pointer;display:inline-block;text-decoration:none;color:inherit}
+  button.primary{background:#2563eb;border-color:#2563eb;color:#fff}
+  #msg{margin-top:12px;font-size:13.5px;min-height:20px}
+</style>
+</head>
+<body>
+<!-- 수동·회귀 확인용 "버그투성이" 데모 사이트 (2/2). data-expect 는 ER 이 내려야 할 판정이다. -->
+<header>
+  <b>👤 회원 설정</b>
+  <a class="btn" id="toOrders" href="/test-buggy.html" data-expect="PASS" style="color:#fff;border-color:#4b5563;background:transparent;margin:0">관리자 홈으로</a>
+</header>
+<main>
+  <div class="card">
+    <h2>프로필</h2>
+    <label for="nick">닉네임</label><input id="nick" value="demo_user">
+    <div>
+      <button id="save" class="primary" data-expect="ERROR" data-reason="HTTP 500" onclick="fetch('/api/_test/500',{method:'POST'})">저장</button>
+      <button id="avatar" data-expect="ERROR" onclick="uploadAvatar()">프로필 사진 변경</button>
+      <button id="check" data-expect="PASS" onclick="document.getElementById('msg').textContent='사용 가능한 닉네임입니다'">중복 확인</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+  <div class="card">
+    <h2>알림</h2>
+    <button id="notify" data-expect="NO-RESPONSE" aria-pressed="false">마케팅 수신 동의</button>
+    <button id="pwd" data-expect="ERROR" onclick="JSON.parse('{비밀번호')">비밀번호 변경</button>
+    <a class="btn" id="partner" data-expect="PASS" href="/api/_test/redirect-away">제휴 페이지 (다른 사이트로 넘김)</a>
+  </div>
+</main>
+<script>
+  // 배경 소음 — 0.7초마다 알림 개수를 폴링하고, 1.1초마다 배경에서 에러가 난다.
+  // 버튼과 무관한 이것들 때문에 무감 버튼이 정상으로, 모든 버튼이 에러로 잡히면 안 된다.
+  setInterval(() => fetch('/api/_test/ok?t=' + Date.now()), 700);
+  let beat = 0;
+  setInterval(() => console.error(`[notify] 알림 소켓 재연결 실패 (${++beat}회)`), 1100);
+
+  // 버그: 파일 선택 창을 여는 input 이 이 페이지에 없다
+  function uploadAvatar() { document.querySelector('#avatarInput').click(); }
+</script>
+</body>
+</html>

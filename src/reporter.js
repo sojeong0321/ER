@@ -12,7 +12,7 @@ const NAME = {
   ERROR: '에러', 'NO-RESPONSE': '무감', PASS: '정상',
   EXCLUDED: '검사 제외', UNCLICKABLE: '클릭 불가',
 };
-const SIGNAL = { dom: '화면 구조', net: '서버 요청', url: '주소 이동', vis: '화면 표시', scroll: '스크롤', popup: '새 창', console: 'JS 예외' };
+const SIGNAL = { dom: '화면 구조', net: '서버 요청', url: '주소 이동', vis: '화면 표시', scroll: '스크롤', popup: '새 창', dialog: '알림창', console: 'JS 예외' };
 const ORDER = { ERROR: 0, 'NO-RESPONSE': 1, UNCLICKABLE: 2, PASS: 3, EXCLUDED: 4 };
 
 function counts(list) {
@@ -25,7 +25,12 @@ function esc(s) {
 }
 function cls(status) { return status === 'NO-RESPONSE' ? 'nr' : status.toLowerCase(); }
 
-function buildHtml(results, meta) {
+/**
+ * @param {string} [opts.shotBase] 스크린샷 주소 앞부분. 기본은 리포트 옆 shots/ 폴더(폴더째 공유할 때).
+ *                                 서버가 바로 보여주는 리포트는 파일 위치가 달라 절대 경로를 넘긴다.
+ */
+function buildHtml(results, meta, opts = {}) {
+  const shotBase = opts.shotBase || 'shots/';
   const c = counts(results);
   const defects = c.ERROR + c['NO-RESPONSE'];
   const tested = c.PASS + c.ERROR + c['NO-RESPONSE'];
@@ -48,7 +53,7 @@ function buildHtml(results, meta) {
         <td class="sig">${r.signals && Object.keys(r.signals).length
           ? Object.entries(SIGNAL).filter(([k]) => r.signals[k]).map(([k, n]) => `<span class="${k === 'console' ? 'bad' : ''}">${n}</span>`).join('') || '—'
           : '—'}</td>
-        <td class="shot">${r.screenshot ? `<a href="shots/${encodeURIComponent(r.screenshot)}" target="_blank">화면</a>` : ''}</td>
+        <td class="shot">${r.screenshot ? `<a href="${esc(shotBase)}${encodeURIComponent(r.screenshot)}" target="_blank" rel="noopener">화면</a>` : ''}</td>
       </tr>`).join('');
     return `
     <section class="grp">
@@ -206,8 +211,8 @@ function saveHtml(results, meta, outputDir) {
   return filePath;
 }
 
-function saveExcel(results, meta, outputDir) {
-  fs.mkdirSync(outputDir, { recursive: true });
+/** 엑셀 통합 문서를 만든다 — 파일로 저장하거나 그대로 내려보낸다 */
+function buildWorkbook(results, meta) {
   const c = counts(results);
   const tested = c.PASS + c.ERROR + c['NO-RESPONSE'];
   const pages = [...new Set(results.map(r => r.page))];
@@ -253,10 +258,19 @@ function saveExcel(results, meta, outputDir) {
   wsDet['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: detail.length - 1, c: header.length - 1 } }) };
   wsDet['!freeze'] = { xSplit: 0, ySplit: 1 };
   XLSX.utils.book_append_sheet(wb, wsDet, '상세');
+  return wb;
+}
 
+/** 내려받기용 엑셀 — 요청마다 메모리에서 만든다. 파일로 쓰면 동시에 받는 요청끼리 서로 덮어쓴다. */
+function buildExcel(results, meta) {
+  return XLSX.write(buildWorkbook(results, meta), { type: 'buffer', bookType: 'xlsx' });
+}
+
+function saveExcel(results, meta, outputDir) {
+  fs.mkdirSync(outputDir, { recursive: true });
   const filePath = path.join(outputDir, 'smoke-report.xlsx');
-  XLSX.writeFile(wb, filePath);
+  XLSX.writeFile(buildWorkbook(results, meta), filePath);
   return filePath;
 }
 
-module.exports = { saveHtml, saveExcel, saveMarkdown, buildHtml, buildMarkdown };
+module.exports = { saveHtml, saveExcel, saveMarkdown, buildHtml, buildMarkdown, buildExcel };

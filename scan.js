@@ -84,8 +84,19 @@ if (!targetUrl || has('--help') || has('-h')) {
 
 // ── 옵션 조립 (이전 버전은 이 옵션들을 crawl 에 넘기지 않아 전부 무시됐다) ──
 const scope = val('--scope', rules.scope ?? 'path');
-const observeMs = parseInt(val('--observe', rules.observeMs ?? 2000), 10);
-const maxPages = parseInt(val('--max-pages', rules.maxPages ?? 50), 10);
+const observeMs = Number(val('--observe', rules.observeMs ?? 2000));
+const maxPages = Number(val('--max-pages', rules.maxPages ?? 50));
+// 잘못된 값으로 조용히 다르게 검사하지 않도록 시작 전에 멈춘다
+const badOption =
+  !['page', 'path', 'domain'].includes(scope) ? `--scope 는 page, path, domain 중 하나여야 합니다 (받은 값: ${scope})`
+  : !(Number.isInteger(observeMs) && observeMs >= 300 && observeMs <= 60000) ? `--observe 는 300~60000 사이의 정수(ms)여야 합니다 (받은 값: ${val('--observe', '')})`
+  : !(Number.isInteger(maxPages) && maxPages >= 1 && maxPages <= 1000) ? `--max-pages 는 1~1000 사이의 정수여야 합니다 (받은 값: ${val('--max-pages', '')})`
+  : !/^https?:\/\//i.test(targetUrl) ? `주소는 http:// 또는 https:// 로 시작해야 합니다 (받은 값: ${targetUrl})`
+  : null;
+if (badOption) {
+  console.error(`\n  ${badOption}\n`);
+  process.exit(2);
+}
 const excludeRules = val('--exclude', rules.excludeRules.join(','))
   .split(',').map(s => s.trim()).filter(Boolean);
 // 로그인 방식: 명령줄 옵션이 프로젝트 설정보다 우선한다
@@ -159,13 +170,15 @@ const color = (s, t) => `${C[s] || ''}${t}${C.reset}`;
   }
 
   const t0 = Date.now();
-  let pageNo = 0;
+  let pageNo = 0, scannedPages = 0;
 
   const results = await crawl(browser, targetUrl, scope, ev => {
+    if (ev.type === 'done') scannedPages++;   // 건너뛴 주소는 세지 않는다
     if (quiet) return;
     if (ev.type === 'page') { pageNo++; console.log(`  ${C.dim}[${pageNo}]${C.reset} ${ev.url}`); }
     if (ev.type === 'done') console.log(`      ${C.dim}→ ${ev.count}개 요소 검사 완료${C.reset}`);
     if (ev.type === 'pageError') console.log(`      ${color('ERROR', '접근 실패')} ${ev.msg}`);
+    if (ev.type === 'redirected') console.log(`      ${C.dim}주소가 넘겨짐 → ${ev.to}${C.reset}`);
     if (ev.type === 'limit') console.log(`  ${C.dim}최대 페이지 수(${ev.max}) 도달 — ${ev.skipped}개 건너뜀${C.reset}`);
   }, { observeMs, excludeRules, maxPages, clickNewTab, clickExternal, screenshotDir: ensureDir(path.join(outputDir, 'shots')) });
 
@@ -189,7 +202,7 @@ const color = (s, t) => `${C[s] || ''}${t}${C.reset}`;
   }
 
   console.log('');
-  console.log(`  총 ${results.length}개 요소 · ${pageNo}개 페이지 · ${elapsed}s`);
+  console.log(`  총 ${results.length}개 요소 · ${scannedPages}개 페이지 · ${elapsed}s`);
   console.log(`  ${color('PASS', `PASS ${c.PASS}`)}  ${color('ERROR', `ERROR ${c.ERROR}`)}  ${color('NO-RESPONSE', `NO-RESPONSE ${c['NO-RESPONSE']}`)}  ${color('EXCLUDED', `EXCLUDED ${c.EXCLUDED + c.UNCLICKABLE}`)}`);
   console.log(`  Pass율 ${rate}%`);
   console.log('');

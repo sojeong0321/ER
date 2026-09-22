@@ -13,9 +13,12 @@ function explainClick(raw, timeoutMs) {
 
   // 다른 요소가 덮고 있어 클릭이 닿지 않는 경우 — 가장 흔하다
   if (/intercepts pointer events/i.test(m)) {
-    const tag = m.match(/<(\w+)[^>]*>[^<]*<\/\w+>?\s*(?:from\s+)?intercepts pointer events/i)?.[1]
-      || m.match(/<(\w+)[^>]*>\s*intercepts pointer events/i)?.[1];
-    const cls = m.match(/intercepts pointer events/i) && m.match(/<\w+[^>]*class="([^"]{1,40})"/i)?.[1];
+    // Call log 에는 클릭하려던 요소도 함께 찍힌다. 덮은 요소는 "intercepts" 가 있는 줄의 첫 태그다.
+    // 메시지 전체에서 class 를 찾으면 클릭 대상의 class 를 덮은 요소의 것으로 잘못 붙인다.
+    const line = m.split('\n').find(l => /intercepts pointer events/i.test(l)) || '';
+    const open = line.match(/<(\w+)([^>]*)>/);
+    const tag = open?.[1];
+    const cls = open?.[2].match(/class="([^"]{1,40})"/)?.[1];
     const who = tag ? `<${tag}${cls ? ` class="${cls.split(' ')[0]}"` : ''}>` : '다른 요소';
     return `${who} 가 위를 덮고 있어 클릭이 닿지 않습니다`;
   }

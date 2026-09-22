@@ -9,6 +9,7 @@
  * 저장 위치 (모두 git 에 올라가지 않는다 — 계정 정보가 들어 있다)
  *   data/projects.json            프로젝트 목록
  *   data/sessions/<id>.json       "직접 로그인" 으로 저장한 세션
+ * data/ 대신 ER_DATA_DIR 로 다른 폴더를 쓸 수 있다 (배포 서버의 영구 볼륨·테스트용 임시 폴더).
  *
  * 비밀번호·OTP 는 저장하되 화면으로 되돌려주지 않는다. publicView() 를 거친 것만 내보낸다.
  */
@@ -17,7 +18,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const ROOT = path.join(__dirname, '..');
-const DATA_DIR = path.join(ROOT, 'data');
+const DATA_DIR = process.env.ER_DATA_DIR ? path.resolve(process.env.ER_DATA_DIR) : path.join(ROOT, 'data');
 const FILE = path.join(DATA_DIR, 'projects.json');
 const SESS_DIR = path.join(DATA_DIR, 'sessions');
 
@@ -53,12 +54,22 @@ function newId() {
 /* ────────────────── 읽기·쓰기 ────────────────── */
 
 function readAll() {
+  let raw;
   try {
-    const list = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return null;   // 파일이 없다 — 처음 실행이거나 이관 전
+    raw = fs.readFileSync(FILE, 'utf8');
+  } catch (e) {
+    if (e.code === 'ENOENT') return null;   // 파일이 없다 — 처음 실행이거나 이관 전
+    throw e;
   }
+  try {
+    const list = JSON.parse(raw);
+    if (Array.isArray(list)) return list.filter(p => p && typeof p === 'object' && p.id);
+  } catch {}
+  // 내용이 망가졌다. 새로 만들면 기존 프로젝트·계정이 소리 없이 사라지므로, 원본을 옆에 남겨 둔다.
+  const backup = `${FILE}.broken-${Date.now()}`;
+  try { fs.renameSync(FILE, backup); } catch {}
+  console.error(`[ER] 프로젝트 파일을 읽을 수 없어 새로 만듭니다. 원본은 ${backup} 에 남겨 두었습니다.`);
+  return [];
 }
 
 function writeAll(list) {
@@ -213,6 +224,7 @@ function update(id, patch = {}) {
 
   if (Array.isArray(patch.urls)) {
     p.urls = patch.urls
+      .filter(u => u && typeof u === 'object')
       .map(u => ({ id: u.id || newId(), label: String(u.label || '').trim().slice(0, 40), url: String(u.url || '').trim() }))
       .filter(u => /^https?:\/\//i.test(u.url))
       .slice(0, 50);
@@ -234,7 +246,11 @@ function update(id, patch = {}) {
   if (patch.auth && typeof patch.auth === 'object') {
     const a = patch.auth, next = { ...p.auth };
     if ('mode' in a && AUTH_MODES.includes(a.mode)) next.mode = a.mode;
-    if ('url' in a) next.url = String(a.url || '').trim();
+    if ('url' in a) {
+      const url = String(a.url || '').trim();
+      if (url && !/^https?:\/\//i.test(url)) throw new Error('로그인 주소는 http:// 또는 https:// 로 시작해야 합니다.');
+      next.url = url;
+    }
     if ('username' in a) next.username = String(a.username || '').trim();
     if (a.password) next.password = String(a.password);
     if (a.otp) next.otp = String(a.otp).trim();

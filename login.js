@@ -22,7 +22,8 @@ if (!project) {
   process.exit(1);
 }
 
-const url = args.find((a, i) => !a.startsWith('--') && i !== pi + 1) || project.auth.url || cfg.login?.url;
+// --project 다음 자리는 프로젝트 이름이다. --project 가 없으면(pi = -1) 첫 인자가 주소일 수 있다.
+const url = args.find((a, i) => !a.startsWith('--') && (pi === -1 || i !== pi + 1)) || project.auth.url || cfg.login?.url;
 if (!url) {
   console.error(`
   사용법: npm run login -- <로그인 주소> [--project <이름|id>]

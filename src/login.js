@@ -51,19 +51,6 @@ async function firstVisible(page, selectors) {
   return null;
 }
 
-/** 사람이 입력해야만 통과되는 인증 단계가 있는지 본다 */
-async function detectSecondFactor(page) {
-  return page.evaluate(() => {
-    const hit = [...document.querySelectorAll('input')].find(el => {
-      if (!(el.offsetWidth || el.offsetHeight)) return false;
-      const hint = ((el.placeholder || '') + ' ' + (el.name || '') + ' ' + (el.id || '') + ' ' +
-                    (el.getAttribute('autocomplete') || '')).toLowerCase();
-      return /otp|one-?time|2fa|mfa|인증번호|인증코드|보안코드/.test(hint);
-    });
-    return hit ? (hit.placeholder || hit.name || hit.id || 'OTP') : null;
-  }).catch(() => null);
-}
-
 /** 화면에 보이는 OTP 입력칸을 찾아 선택자를 붙여 반환한다 (없으면 null) */
 async function markOtpField(page) {
   return page.evaluate(() => {
@@ -289,4 +276,4 @@ function otpGuide() {
     '문자·이메일로 받는 방식이라면 "직접 로그인"으로 한 번 로그인해 상태를 저장하세요.';
 }
 
-module.exports = { doLogin, captureSession, markOtpField, detectSecondFactor };
+module.exports = { doLogin, captureSession };

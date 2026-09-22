@@ -14,6 +14,7 @@
  */
 const defaultCfg = require('../config.json');
 const path = require('path');
+const crypto = require('crypto');
 const { explainClick, explainRequestFailure } = require('./explain');
 
 const CLICKABLE = 'button, a, [role=button], [onclick], input[type=button], input[type=submit], input[type=reset]';
@@ -43,11 +44,27 @@ function siteOf(host) {
 }
 
 const NOISE_SAMPLE_MS = 1000;   // 페이지 노이즈 측정 시간
+const LATE_GRACE_MS = 1000;     // 관찰이 끝난 직후 늦게 도착한 반응은 배경 소음으로 배우지 않는다
 const POLL_MS = 100;            // 적응형 대기 폴링 간격
 const SETTLE_MS = 350;          // 신호 감지 후 추가 관찰 시간
 const MIN_OBSERVE_MS = 400;     // 최소 관찰 시간 (즉시 반응도 놓치지 않도록)
 
 /* ────────────────────────── 브라우저 측 계측 ────────────────────────── */
+
+/**
+ * 화면에 떠 있는 모달과, 그 안에 든 검사 대상 요소(data-er-i).
+ * 숨겨 둔 [role=dialog] 는 세지 않는다.
+ */
+function readOpenModals(page) {
+  return page.evaluate(() => {
+    const open = [...document.querySelectorAll('dialog[open], [role=dialog], [aria-modal="true"]')]
+      .filter(el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+    const inside = [...document.querySelectorAll('[data-er-i]')]
+      .filter(el => open.some(m => m.contains(el)))
+      .map(el => Number(el.getAttribute('data-er-i')));
+    return { count: open.length, inside };
+  }).catch(() => ({ count: 0, inside: [] }));
+}
 
 /**
  * 화면이 다 그려질 때까지 기다린다.
@@ -163,24 +180,50 @@ async function readWatch(page) {
  * 여기서 본 위치(시계·캐러셀·폴링 배너 등)는 이후 클릭 판정에서 신호로 세지 않는다.
  */
 async function measureNoise(page) {
-  const empty = { sigs: new Set(), net: 0, visNoisy: false, scrollNoisy: false };
+  const reqs = new Set(), errs = new Set();
+  const empty = { sigs: new Set(), reqs, errs, visNoisy: false, scrollNoisy: false };
   if (!(await startWatching(page))) return empty;
 
-  let net = 0;
-  const onReq = req => { if (!NOISE_REQUEST.test(req.url())) net++; };
+  // 클릭 없이 나가는 요청(폴링)과 저절로 나는 콘솔 에러를 기록해 둔다.
+  // 이걸 빼지 않으면 폴링하는 화면에서는 아무 반응 없는 버튼도 "서버 요청 있음" 으로 정상 판정되고,
+  // 배경에서 에러가 반복되는 화면에서는 모든 버튼이 에러로 잡힌다.
+  const onReq = req => reqs.add(requestKey(req));
+  const onConsole = msg => { if (msg.type() === 'error') errs.add(errorKey(msg.text())); };
+  const onPageErr = err => errs.add(errorKey(err?.message || err));
   page.on('request', onReq);
+  page.on('console', onConsole);
+  page.on('pageerror', onPageErr);
   await page.waitForTimeout(NOISE_SAMPLE_MS);
   page.off('request', onReq);
+  page.off('console', onConsole);
+  page.off('pageerror', onPageErr);
 
   const m = await readWatch(page);
   if (!m) return empty;
   return {
     sigs: new Set(Object.keys(m.hits)),
-    net,
+    reqs, errs,
     // 화면 지문이 저절로 흔들리는 페이지면 그 신호는 신뢰하지 않는다
     visNoisy: m.visChanged === true,
     scrollNoisy: m.scrolled === true,   // 자동 스크롤 배너가 도는 페이지
   };
+}
+
+/** 같은 종류의 요청인지 가리는 열쇠 — 폴링은 쿼리(타임스탬프 등)만 바뀌므로 경로까지만 본다 */
+function requestKey(req) {
+  try { const u = new URL(req.url()); return `${req.method()} ${u.origin}${u.pathname}`; }
+  catch { return `${req.method()} ${req.url()}`; }
+}
+/** 같은 에러인지 가리는 열쇠 — 반복되는 에러는 숫자(시각·횟수)만 바뀌는 경우가 많다 */
+function errorKey(text) {
+  return String(text || '').slice(0, 200).replace(/\d+/g, '#');
+}
+
+/** 숫자 옵션을 받아들일 범위로 맞춘다. 숫자가 아니면 기본값 — NaN 이 들어오면 관찰이 끝나지 않는다 */
+function clampNum(v, lo, hi, fallback) {
+  const n = Number(v);
+  if (v === undefined || v === null || v === '' || !Number.isFinite(n)) return fallback;
+  return Math.min(hi, Math.max(lo, n));
 }
 
 /**
@@ -209,9 +252,12 @@ function CSS_escape(s) { return String(s).replace(/([ !"#$%&'()*+,./:;<=>?@[\]^`
 /* ────────────────────────── 메인 ────────────────────────── */
 
 async function scanPage(page, pageUrl, opts = {}) {
-  const OBSERVE_MS = opts.observeMs ?? defaultCfg.observeMs ?? 2000;
+  const OBSERVE_MS = clampNum(opts.observeMs, 300, 60000, clampNum(defaultCfg.observeMs, 300, 60000, 2000));
   const EXCLUDE_RULES = (opts.excludeRules ?? defaultCfg.excludeRules ?? []).filter(Boolean);
   const shotDir = opts.screenshotDir || null;
+  // 스크린샷 폴더는 검사 전체가 함께 쓴다. 페이지마다 순번이 0 부터 다시 시작하므로
+  // 페이지 주소로 이름을 나누지 않으면 뒤 페이지의 결함 화면이 앞 페이지 것을 덮어쓴다.
+  const shotTag = crypto.createHash('sha1').update(pageUrl).digest('hex').slice(0, 6);
   // 새 창으로 뜨는 화면(결제창 등)을 검사하려면 새 탭 링크를 눌러봐야 한다
   const CLICK_NEW_TAB = opts.clickNewTab === true;
   const CLICK_EXTERNAL = opts.clickExternal === true;
@@ -227,6 +273,16 @@ async function scanPage(page, pageUrl, opts = {}) {
   const ctx = page.context();
   let clickInProgress = false;
   let popupSeen = null;
+  let dialogSeen = null;
+
+  // alert·confirm 으로만 반응하는 버튼이 많다(사내 시스템에서 특히). 이것도 반응으로 센다.
+  // confirm 은 "취소" 로 닫는다 — 삭제 확인 같은 창을 대신 승인하지 않도록.
+  // 페이지를 떠날지 묻는 창(beforeunload)은 받아들여야 원래 화면으로 돌아갈 수 있다.
+  const onDialog = d => {
+    if (clickInProgress && d.type() !== 'beforeunload') dialogSeen = { type: d.type(), message: d.message() };
+    (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {});
+  };
+  page.on('dialog', onDialog);
   const onPopup = async p => {
     if (clickInProgress) {
       const url = await Promise.resolve(p.url()).catch(() => '');
@@ -235,10 +291,33 @@ async function scanPage(page, pageUrl, opts = {}) {
     p.close().catch(() => {});
   };
   ctx.on('page', onPopup);
+  let bgOff = () => {};
 
   try {
     const total = await stampElements(page, CLICKABLE);
     const noise = await measureNoise(page);
+
+    // 처음 1초 동안 못 본 폴링·배경 에러도 있다. 클릭하지 않는 동안 일어난 것은 계속 배경으로 배운다.
+    // 관찰이 끝난 직후에 늦게 도착한 것은 방금 누른 버튼의 반응일 수 있어 배우지 않는다.
+    // 원래 화면으로 되돌리는 동안(뒤로가기·다시 열기)도 배우지 않는다 — 화면을 처음 그릴 때 부르는
+    // 데이터 요청까지 소음으로 배우면, 같은 요청을 다시 부르는 "조회" 버튼을 무감으로 잘못 잡는다.
+    let learnAfter = 0;
+    const pauseLearning = () => { learnAfter = Infinity; };
+    const resumeLearning = () => { learnAfter = Date.now() + LATE_GRACE_MS; };
+    const learning = () => !clickInProgress && Date.now() >= learnAfter;
+    const onBgReq = req => { if (learning()) noise.reqs.add(requestKey(req)); };
+    const onBgConsole = msg => { if (msg.type() === 'error' && learning()) noise.errs.add(errorKey(msg.text())); };
+    const onBgPageErr = err => { if (learning()) noise.errs.add(errorKey(err?.message || err)); };
+    page.on('request', onBgReq);
+    page.on('console', onBgConsole);
+    page.on('pageerror', onBgPageErr);
+    bgOff = () => {
+      page.off('request', onBgReq);
+      page.off('console', onBgConsole);
+      page.off('pageerror', onBgPageErr);
+    };
+    // 처음부터 떠 있는 모달(쿠키 동의 등)은 페이지의 원래 모습으로 본다
+    const modalsAtLoad = (await readOpenModals(page)).count;
 
     // 검사 차례. 지금 숨어 있는 요소는 뒤로 미뤘다가 한 번 더 본다.
     // 탭으로 화면을 나누는 곳에서는 다른 탭을 눌러야 드러나는 요소가 많다.
@@ -319,6 +398,28 @@ async function scanPage(page, pageUrl, opts = {}) {
           continue;
         }
       }
+      // ── 앞선 클릭이 열어 둔 모달이 있으면, 모달 밖 요소를 누르기 전에 닫는다 ──
+      // 열어 둔 채 누르면 모달에 가려 "클릭 불가" 로 잘못 잡힌다.
+      // Esc 로 먼저 닫아 보고, 안 닫히는 모달이면 페이지를 다시 연다.
+      let modals = await readOpenModals(page);
+      if (modals.count > modalsAtLoad && !modals.inside.includes(i)) {
+        await page.keyboard.press('Escape').catch(() => {});
+        await page.waitForTimeout(300).catch(() => {});
+        modals = await readOpenModals(page);
+        if (modals.count > modalsAtLoad) {
+          if (shouldStop()) break;
+          pauseLearning();
+          const back = await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
+            .then(() => true).catch(() => false);
+          if (back) {
+            await waitForContent(page);
+            await stampElements(page, CLICKABLE);
+            locator = page.locator(`[data-er-i="${i}"]`).first();
+          }
+          resumeLearning();
+        }
+      }
+
       if (!(await locator.isVisible().catch(() => false))) {
         if (!retried.has(i)) {
           retried.add(i);
@@ -336,18 +437,19 @@ async function scanPage(page, pageUrl, opts = {}) {
 
       const onReq = req => {
         if (!clickedAt) return;                       // 클릭 전 요청은 노이즈
-        if (NOISE_REQUEST.test(req.url())) return;
+        if (NOISE_REQUEST.test(req.url()) || noise.reqs.has(requestKey(req))) return;
         netHits++;
       };
       const onResp = resp => {
         if (!clickedAt || badStatus) return;
+        if (noise.reqs.has(requestKey(resp.request()))) return;   // 배경 폴링의 실패는 이 버튼 탓이 아니다
         if (resp.status() >= 400 && !NOISE_REQUEST.test(resp.url())) {
           badStatus = { status: resp.status(), url: resp.url() };
         }
       };
       const onFailed = req => {
         if (!clickedAt || failedOwn) return;
-        if (NOISE_REQUEST.test(req.url())) return;
+        if (NOISE_REQUEST.test(req.url()) || noise.reqs.has(requestKey(req))) return;
 
         // 링크를 클릭하면 브라우저가 그 페이지로 이동을 시작한다. 관찰이 끝나고 우리가
         // 원래 페이지로 되돌리면 진행 중이던 요청이 "취소" 된다. 사이트의 결함이 아니라
@@ -366,10 +468,15 @@ async function scanPage(page, pageUrl, opts = {}) {
       const onConsole = msg => {
         if (!clickedAt || jsError || msg.type() !== 'error') return;
         const t = msg.text();
-        if (NOISE_CONSOLE.test(t)) return;
+        if (NOISE_CONSOLE.test(t) || noise.errs.has(errorKey(t))) return;
         jsError = t.slice(0, 200);
       };
-      const onPageErr = err => { if (clickedAt && !jsError) jsError = String(err?.message || err).slice(0, 200); };
+      const onPageErr = err => {
+        if (!clickedAt || jsError) return;
+        const t = String(err?.message || err);
+        if (noise.errs.has(errorKey(t))) return;
+        jsError = t.slice(0, 200);
+      };
 
       page.on('request', onReq);
       page.on('response', onResp);
@@ -378,10 +485,12 @@ async function scanPage(page, pageUrl, opts = {}) {
       page.on('pageerror', onPageErr);
 
       await startWatching(page);
+      const modalsBefore = (await readOpenModals(page)).count;
 
       // ── 클릭 ──
       let clickFail = null;
       popupSeen = null;
+      dialogSeen = null;
       clickInProgress = true;
       clickedAt = Date.now();
       try {
@@ -403,7 +512,7 @@ async function scanPage(page, pageUrl, opts = {}) {
         mut = m;
         if (waited < MIN_OBSERVE_MS) continue;
         const sig = freshSignals(m, noise);
-        if (sig.dom || sig.vis || sig.scroll || popupSeen || netHits > 0 || page.url() !== urlBefore) {
+        if (sig.dom || sig.vis || sig.scroll || popupSeen || dialogSeen || netHits > 0 || page.url() !== urlBefore) {
           await page.waitForTimeout(SETTLE_MS).catch(() => {});
           mut = (await readWatch(page)) || m;
           break;
@@ -411,6 +520,7 @@ async function scanPage(page, pageUrl, opts = {}) {
       }
       const observedMs = Date.now() - t0;
       clickInProgress = false;
+      resumeLearning();
 
       page.off('request', onReq);
       page.off('response', onResp);
@@ -433,6 +543,7 @@ async function scanPage(page, pageUrl, opts = {}) {
         vis: ex.vis ? 1 : 0,
         scroll: ex.scroll ? 1 : 0,
         popup: popupSeen ? 1 : 0,
+        dialog: dialogSeen ? 1 : 0,
       };
 
       // ── 판정 ──
@@ -444,17 +555,20 @@ async function scanPage(page, pageUrl, opts = {}) {
       } else if (failedOwn) {
         status = 'ERROR';
         reason = `${failedOwn.why} — ${shortUrl(failedOwn.url)}`;
-      } else if (!signals.dom && !signals.net && !signals.url && !signals.vis && !signals.scroll && !signals.popup) {
+      } else if (!signals.dom && !signals.net && !signals.url && !signals.vis && !signals.scroll && !signals.popup && !signals.dialog) {
         status = 'NO-RESPONSE'; reason = `클릭 후 ${(observedMs / 1000).toFixed(1)}초 동안 무변화`;
       } else {
         status = 'PASS';
-        reason = popupSeen ? `새 창이 열림 — ${shortUrl(popupSeen)}` : describe(signals);
+        reason = popupSeen ? `새 창이 열림 — ${shortUrl(popupSeen)}`
+          : dialogSeen && !signals.dom && !signals.net && !signals.url
+            ? `알림창 표시 — "${dialogSeen.message.slice(0, 60)}"`
+            : describe(signals);
       }
 
       // ── 결함만 스크린샷 ──
       let screenshot = null;
       if (shotDir && (status === 'ERROR' || status === 'NO-RESPONSE')) {
-        const file = `${results.length}-${status}.png`;
+        const file = `${shotTag}-${results.length}-${status}.png`;
         const ok = await page.screenshot({ path: path.join(shotDir, file), timeout: 5000 })
           .then(() => true).catch(() => false);
         if (ok) screenshot = file;
@@ -465,6 +579,7 @@ async function scanPage(page, pageUrl, opts = {}) {
       // ── 페이지를 벗어났으면 원위치 복귀 후 마커 재부여 ──
       if (urlChanged) {
         if (shouldStop()) break;
+        pauseLearning();
 
         // 뒤로가기가 먼저다. 주소를 다시 불러오는 것보다 빠르고 진행 중이던 이동을 덜 끊는다.
         // 돌아왔는지는 주소를 정규화해서 본다 (끝의 / 나 해시 차이로 실패 판정하지 않도록).
@@ -499,6 +614,20 @@ async function scanPage(page, pageUrl, opts = {}) {
         // 남은 요소를 못 찾아 나머지를 통째로 건너뛰게 된다.
         await waitForContent(page);
         await stampElements(page, CLICKABLE);
+        resumeLearning();
+      } else {
+        // ── 클릭으로 모달이 열렸으면 그 안의 요소를 먼저 검사한다 ──
+        // 모달은 보통 문서 끝에 있어, 순서대로 가면 모달 밖 요소를 누르느라 닫은 뒤라 영영 못 누른다.
+        const opened = await readOpenModals(page);
+        if (opened.count > modalsBefore) {
+          const later = new Set(queue.slice(qi + 1));
+          const first = opened.inside.filter(x => later.has(x));
+          if (first.length) {
+            const pick = new Set(first);
+            const rest = queue.slice(qi + 1).filter(x => !pick.has(x));
+            queue.splice(qi + 1, queue.length, ...first, ...rest);
+          }
+        }
       }
     }
   } catch (e) {
@@ -507,6 +636,8 @@ async function scanPage(page, pageUrl, opts = {}) {
     if (!shouldStop()) throw e;
   } finally {
     try { ctx.off('page', onPopup); } catch {}
+    try { page.off('dialog', onDialog); } catch {}
+    try { bgOff(); } catch {}
   }
 
   return results;
@@ -558,7 +689,8 @@ function describe(s) {
   if (s.vis) hit.push('화면');
   if (s.scroll) hit.push('스크롤');
   if (s.popup) hit.push('새 창');
+  if (s.dialog) hit.push('알림창');
   return hit.join(' + ') + ' 변화 감지';
 }
 
-module.exports = { scanPage, CLICKABLE, siteOf, waitForContent };
+module.exports = { scanPage, waitForContent };

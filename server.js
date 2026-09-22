@@ -16,7 +16,7 @@ const { doLogin } = require('./src/login');
 const projects = require('./src/projects');
 const totp = require('./src/totp');
 const { crawl } = require('./src/crawler');
-const { saveHtml, saveExcel, saveMarkdown, buildHtml, buildMarkdown } = require('./src/reporter');
+const { saveHtml, saveExcel, saveMarkdown, buildHtml, buildMarkdown, buildExcel } = require('./src/reporter');
 
 /**
  * config.json 은 저장소에 들어가는 기본값이다. 로그인 폼 선택자 같은 공통 값만 여기서 쓰고,
@@ -34,6 +34,12 @@ const PUBLIC_MODE = /^(1|true|yes)$/i.test(process.env.ER_PUBLIC || '');
 const MAX_RUNNING = Number(process.env.ER_MAX_RUNNING) || (PUBLIC_MODE ? 2 : Infinity);
 const PUBLIC_MAX_PAGES = 20;
 
+/** 리포트·스크린샷·검사 이력을 두는 곳. ER_REPORTS_DIR 로 바꿀 수 있다 (영구 볼륨·테스트용 임시 폴더). */
+const REPORTS_DIR = process.env.ER_REPORTS_DIR ? path.resolve(process.env.ER_REPORTS_DIR) : path.join(__dirname, 'reports');
+
+/** async 라우트의 예외를 오류 응답으로 바꾼다. Express 4 는 이를 잡지 않아 요청이 멈추거나 서버가 죽는다. */
+const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
 // 처음 실행이면 여기서 기존 설정 파일을 프로젝트로 옮겨 담는다
 projects.list();
 
@@ -43,7 +49,10 @@ const io = new Server(server);
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/reports', express.static(path.join(__dirname, 'reports')));
+// 리포트 폴더에는 검사별 폴더(<scanId>/…)만 내보낸다. 폴더 바로 아래의 history.json 에는
+// 모든 프로젝트의 검사 주소가 들어 있어 그대로 열어 두면 안 된다.
+app.use('/reports', (req, res, next) => (/^\/[\w-]+\/./.test(req.path) ? next() : res.status(404).json({ error: '없는 경로입니다.' })));
+app.use('/reports', express.static(REPORTS_DIR));
 
 /**
  * 화면별 주소 — /p/<프로젝트>, /p/<프로젝트>/history, /p/<프로젝트>/rules.
@@ -108,7 +117,7 @@ async function publicTargetProblem(url) {
   return null;
 }
 
-/** scanId → { status, events[], results, meta, stop } */
+/** scanId → { status, events[], seq, results, meta, stop } */
 const scans = new Map();
 const MAX_SCANS = 20;
 
@@ -116,14 +125,31 @@ const MAX_SCANS = 20;
  * 이벤트를 저장하면서 내보낸다.
  * 클라이언트가 소켓 룸에 들어오기 전에 발생한 이벤트도 join 시점에 다시 받아볼 수 있어야
  * 진행 로그가 유실되지 않는다. (이전 버전은 400ms 지연으로 타이밍에 기대고 있었다)
+ * 이벤트마다 순번을 붙인다. 연결이 끊겼다 다시 붙으면 받은 것 다음부터만 다시 보내기 위해서다.
  */
 function emitter(scanId) {
   const scan = scans.get(scanId);
   return (event, data) => {
-    scan.events.push({ event, data });
+    const payload = { ...data, scanId, seq: ++scan.seq };
+    scan.events.push({ event, data: payload });
     if (scan.events.length > 2000) scan.events.splice(0, 1000);
-    io.to(scanId).emit(event, data);
+    io.to(scanId).emit(event, payload);
   };
+}
+
+/** 오래된 검사 기록부터 비운다. 진행 중인 검사는 지우지 않는다 — 지우면 중단도 결과 조회도 못 한다. */
+function pruneScans() {
+  for (const [id, s] of scans) {
+    if (scans.size < MAX_SCANS) break;
+    if (s.status !== 'running') scans.delete(id);
+  }
+}
+
+/** 화면에서 온 숫자를 받아들일 범위로 맞춘다 (프로젝트 규칙과 같은 범위) */
+function clampNum(v, lo, hi, fallback) {
+  const n = Number(v);
+  if (v === undefined || v === null || v === '' || !Number.isFinite(n)) return fallback;
+  return Math.min(hi, Math.max(lo, Math.round(n)));
 }
 
 /**
@@ -131,7 +157,7 @@ function emitter(scanId) {
  * 검사 규칙은 화면에서 보낸 값을 쓰되(이번 검사에만 바꿀 수 있도록), 빠진 값은 프로젝트의
  * 기본값으로 채운다. 로그인은 화면에서 받지 않고 프로젝트에 저장된 것만 쓴다.
  */
-app.post('/api/scan', async (req, res) => {
+app.post('/api/scan', wrap(async (req, res) => {
   const b = req.body || {};
   const url = String(b.url || '').trim();
   if (!/^https?:\/\//i.test(url)) {
@@ -153,12 +179,14 @@ app.post('/api/scan', async (req, res) => {
 
   const r = project.rules;
   const pick = (v, fallback) => (v === undefined || v === null || v === '' ? fallback : v);
+  const excludeRules = Array.isArray(b.excludeRules)
+    ? [...new Set(b.excludeRules.map(x => String(x ?? '').trim()).filter(Boolean))].slice(0, 100)
+    : r.excludeRules;
 
-  // 오래된 검사부터 정리
-  while (scans.size >= MAX_SCANS) scans.delete(scans.keys().next().value);
+  pruneScans();
 
   const scanId = crypto.randomUUID().slice(0, 8);
-  scans.set(scanId, { status: 'running', events: [], stop: false, startedAt: Date.now() });
+  scans.set(scanId, { status: 'running', events: [], seq: 0, stop: false, startedAt: Date.now() });
   res.json({ scanId });
 
   runScan(scanId, {
@@ -166,14 +194,14 @@ app.post('/api/scan', async (req, res) => {
     projectId: project.id,
     projectName: project.name,
     scope: ['page', 'path', 'domain'].includes(b.scope) ? b.scope : r.scope,
-    excludeRules: Array.isArray(b.excludeRules) ? b.excludeRules : r.excludeRules,
-    observeMs: Number(pick(b.observeMs, r.observeMs)) || 2000,
-    maxPages: Math.min(Number(pick(b.maxPages, r.maxPages)) || 50, PUBLIC_MODE ? PUBLIC_MAX_PAGES : Infinity),
+    excludeRules,
+    observeMs: clampNum(b.observeMs, 300, 60000, r.observeMs || 2000),
+    maxPages: Math.min(clampNum(b.maxPages, 1, 1000, r.maxPages || 50), PUBLIC_MODE ? PUBLIC_MAX_PAGES : Infinity),
     clickNewTab: !!pick(b.clickNewTab, r.clickNewTab),
     clickExternal: !!pick(b.clickExternal, r.clickExternal),
     ignoreHTTPSErrors: r.ignoreHTTPSErrors !== false,
-  });
-});
+  }).catch(e => console.error('검사 실행 오류:', e));
+}));
 
 app.post('/api/scan/:scanId/stop', (req, res) => {
   const scan = scans.get(req.params.scanId);
@@ -258,7 +286,7 @@ function canOpenWindow() {
 
 /** Runner 상태 — 어떤 브라우저로, 어떤 설정으로 도는지 화면에 밝힌다 */
 let browserVersion = null;
-app.get('/api/runner', async (req, res) => {
+app.get('/api/runner', wrap(async (req, res) => {
   if (!browserVersion) {
     try {
       const b = await chromium.launch({ args: ['--no-sandbox'] });
@@ -278,7 +306,7 @@ app.get('/api/runner', async (req, res) => {
     canOpenWindow: canOpenWindow(),
     publicMode: PUBLIC_MODE,
   });
-});
+}));
 
 /** 같은 사내망에서 접속할 수 있는 주소 — 화면에 그대로 띄운다 */
 app.get('/api/info', (req, res) => {
@@ -307,7 +335,7 @@ async function closeLoginWindow() {
   loginSession = null;
 }
 
-app.post('/api/projects/:id/session/open', async (req, res) => {
+app.post('/api/projects/:id/session/open', wrap(async (req, res) => {
   const project = projects.get(req.params.id);
   if (!project) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
 
@@ -344,10 +372,10 @@ app.post('/api/projects/:id/session/open', async (req, res) => {
     loginSession = null;
     res.status(500).json({ error: `로그인 창을 열지 못했습니다: ${String(e.message).split('\n')[0]}` });
   }
-});
+}));
 
 /** 로그인이 끝난 상태를 이 프로젝트에 저장한다 */
-app.post('/api/projects/:id/session/save', async (req, res) => {
+app.post('/api/projects/:id/session/save', wrap(async (req, res) => {
   if (!loginSession) return res.status(400).json({ error: '열려 있는 로그인 창이 없습니다. 먼저 로그인 창을 여세요.' });
   if (loginSession.projectId !== req.params.id) {
     return res.status(409).json({ error: '다른 프로젝트의 로그인 창이 열려 있습니다. 그 창을 먼저 닫아 주세요.' });
@@ -361,13 +389,13 @@ app.post('/api/projects/:id/session/save', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: `저장하지 못했습니다: ${String(e.message).split('\n')[0]}` });
   }
-});
+}));
 
 /** 로그인 창을 닫는다 (저장하지 않음) */
-app.post('/api/session/cancel', async (req, res) => {
+app.post('/api/session/cancel', wrap(async (req, res) => {
   await closeLoginWindow();
   res.json({ ok: true });
-});
+}));
 
 app.delete('/api/projects/:id/session', (req, res) => {
   projects.clearSession(req.params.id);
@@ -411,10 +439,49 @@ app.get('/test-target.html', (req, res) => res.sendFile(path.join(__dirname, 'te
 /** 회귀 테스트(test-target.html)에서 서버 에러 판정을 검증하기 위한 고정 500 응답 */
 app.get('/api/_test/500', (req, res) => res.status(500).json({ error: 'intentional test error' }));
 app.get('/api/_test/ok', (req, res) => res.json({ ok: true }));
+app.get('/api/_test/list', (req, res) => res.json({ items: [] }));
+app.post('/api/_test/500', (req, res) => res.status(500).json({ error: 'intentional test error' }));
+
+/** 버그 데모 사이트 — 실제 서비스처럼 생긴 화면에서 결함 탐지·스크린샷·리포트를 눈으로 확인한다 */
+app.get(['/test-buggy.html', '/test-buggy-2.html'], (req, res) =>
+  res.sendFile(path.join(__dirname, req.path.slice(1))));
+// 응답 없이 연결을 끊는다 — "서버에 닿지 못한 요청" 판정 확인용
+app.get('/api/_test/drop', req => req.socket.destroy());
+// 다른 사이트로 넘긴다 — 127.0.0.1 로 들어오면 localhost 로 보낸다(호스트가 달라 다른 사이트로 친다).
+// 크롤러가 넘겨진 곳을 검사하지 않는지 확인하는 용도
+app.get('/api/_test/redirect-away', (req, res) => {
+  const port = server.address()?.port || PORT;
+  const host = /^localhost/i.test(req.headers.host || '') ? '127.0.0.1' : 'localhost';
+  res.redirect(302, `http://${host}:${port}/test-target.html`);
+});
+
+/**
+ * 크롤러 회귀 테스트용 작은 사이트 (test/verify-server.js)
+ *   /test-crawl/start.html → a.html · away(다른 사이트로 넘김) · jump(같은 사이트의 범위 밖으로 넘김)
+ *                            · ../test-crawlx/b.html(범위 밖 형제 폴더)
+ */
+app.get(['/test-crawl/:name', '/test-crawlx/:name'], (req, res) => {
+  const name = req.params.name;
+  if (name === 'away') {
+    const port = server.address()?.port || PORT;
+    const host = /^localhost/i.test(req.headers.host || '') ? '127.0.0.1' : 'localhost';
+    return res.redirect(302, `http://${host}:${port}/test-crawl/a.html`);
+  }
+  if (name === 'jump') return res.redirect(302, '/test-crawlx/b.html');
+  const links = {
+    'start.html': ['a.html', 'away', 'jump', '../test-crawlx/b.html', 'start.html#top'],
+    'a.html': ['start.html'],
+    'b.html': [],
+  }[name];
+  if (!links) return res.status(404).send('없는 페이지');
+  res.type('html').send(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${name}</title></head>
+<body><h1>${name}</h1>${links.map(h => `<p><a href="${h}">${h}</a></p>`).join('')}
+${name === 'start.html' ? '<button id="dead">반응 없는 버튼</button>' : ''}</body></html>`);
+});
 
 /* ── 검사 이력 ── */
 
-const HISTORY_FILE = path.join(__dirname, 'reports', 'history.json');
+const HISTORY_FILE = path.join(REPORTS_DIR, 'history.json');
 const HISTORY_KEEP_DAYS = 365;   // 1년 지난 기록은 정리한다
 
 function readHistory() {
@@ -459,7 +526,9 @@ function recordHistory(scanId, meta, results, options) {
   const kept = [], expired = [];
   for (const h of list) ((h.at || 0) >= cutoff ? kept : expired).push(h);
   for (const gone of expired) {
-    fs.rm(path.join(__dirname, 'reports', String(gone.scanId)), { recursive: true, force: true }, () => {});
+    if (/^[\w-]+$/.test(String(gone.scanId))) {
+      fs.rm(path.join(REPORTS_DIR, String(gone.scanId)), { recursive: true, force: true }, () => {});
+    }
   }
 
   fs.mkdirSync(path.dirname(HISTORY_FILE), { recursive: true });
@@ -515,11 +584,14 @@ app.get('/api/report/:scanId/export', (req, res) => {
   };
 
   if (format === 'md') return send(buildMarkdown(picked, meta), 'text/markdown; charset=utf-8', 'md');
-  if (format === 'html') return send(buildHtml(picked, meta), 'text/html; charset=utf-8', 'html');
+  if (format === 'html') {
+    // 새 탭에서 바로 본다. 이 주소는 리포트 폴더 밖이라 스크린샷을 절대 경로로 건다.
+    res.type('html');
+    return res.send(buildHtml(picked, meta, { shotBase: `/reports/${encodeURIComponent(req.params.scanId)}/shots/` }));
+  }
   if (format === 'xlsx') {
-    const dir = path.join(__dirname, 'reports', req.params.scanId, 'export');
-    const file = saveExcel(picked, meta, dir);
-    return res.download(file, `${base}.xlsx`);
+    return send(buildExcel(picked, meta),
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx');
   }
   res.status(400).json({ error: '지원하지 않는 형식입니다.' });
 });
@@ -561,6 +633,7 @@ async function runScan(scanId, options) {
       viewport: { width: 1440, height: 900 },
       ...(storageState ? { storageState } : {}),
     });
+    if (PUBLIC_MODE) await guardInternalRequests(context);
     const page = await context.newPage();
 
     if (auth.mode === 'credentials') {
@@ -571,7 +644,7 @@ async function runScan(scanId, options) {
         password: auth.password,
         otp: auth.otp,
         onLog: msg => emit('log', { msg }),
-        shotDir: ensureDir(path.join(__dirname, 'reports', scanId, 'shots')),
+        shotDir: ensureDir(path.join(REPORTS_DIR, scanId, 'shots')),
       };
 
       // 어떤 값으로 로그인하는지 밝힌다. 비밀번호는 남기지 않는다.
@@ -598,6 +671,7 @@ async function runScan(scanId, options) {
       });
       if (ev.type === 'done') emit('pageResult', { url: ev.url, count: ev.count });
       if (ev.type === 'ready') emit('log', { msg: `화면이 준비됐습니다 — 클릭할 수 있는 요소 ${ev.count}개` });
+      if (ev.type === 'redirected') emit('log', { msg: `주소가 넘겨졌습니다 — ${ev.from} → ${ev.to}` });
       if (ev.type === 'pageError') emit('log', { msg: `접근 실패: ${ev.url} — ${ev.msg}` });
       if (ev.type === 'limit') emit('log', { msg: `최대 페이지 수(${ev.max}) 도달 — ${ev.skipped}개 페이지를 건너뜁니다.` });
       if (ev.type === 'stopped') emit('log', { msg: '사용자 요청으로 중단했습니다.' });
@@ -612,8 +686,10 @@ async function runScan(scanId, options) {
       maxPages,
       clickNewTab,
       clickExternal,
-      screenshotDir: ensureDir(path.join(__dirname, 'reports', scanId, 'shots')),
+      screenshotDir: ensureDir(path.join(REPORTS_DIR, scanId, 'shots')),
       shouldStop: () => scan.stop,
+      // 공개 모드 — 리디렉션으로 서버 안쪽 주소에 도착한 페이지는 검사하지 않는다
+      checkLanded: PUBLIC_MODE ? publicTargetProblem : null,
     });
 
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
@@ -628,7 +704,7 @@ async function runScan(scanId, options) {
       scanId,
     };
 
-    const outputDir = path.join(__dirname, 'reports', scanId);
+    const outputDir = path.join(REPORTS_DIR, scanId);
     saveHtml(results, meta, outputDir);
     saveExcel(results, meta, outputDir);
     saveMarkdown(results, meta, outputDir);
@@ -655,6 +731,32 @@ async function runScan(scanId, options) {
   }
 }
 
+/**
+ * 공개 모드 — 검사 중 브라우저가 서버 안쪽 주소로 요청하지 못하게 막는다.
+ * 시작 주소만 확인하면, 공개 페이지 안의 링크·스크립트·클릭으로 내부망이나 클라우드 메타데이터
+ * 주소에 접근해 그 화면을 스크린샷으로 가져갈 수 있다.
+ * (Playwright 는 리디렉션된 요청을 가로채지 못한다. 그 경우는 도착한 주소를 크롤러가 한 번 더 걸러낸다.)
+ */
+async function guardInternalRequests(context) {
+  const verdict = new Map();   // 호스트 → Promise<막을지>
+  const blocked = host => {
+    if (!verdict.has(host)) {
+      verdict.set(host, require('dns').promises.lookup(host, { all: true })
+        .then(list => !list.length || list.some(a => isInternalIp(a.address)))
+        .catch(() => false));   // 못 찾는 주소는 브라우저가 알아서 실패시킨다
+    }
+    return verdict.get(host);
+  };
+  await context.route('**/*', async route => {
+    let u;
+    try { u = new URL(route.request().url()); } catch { return route.continue(); }
+    if (!/^(https?|wss?):$/.test(u.protocol)) return route.continue();
+    const host = u.hostname.replace(/^\[|\]$/g, '');
+    if (await blocked(host)) return route.abort('blockedbyclient');
+    return route.continue();
+  });
+}
+
 /** Playwright 브라우저 미설치처럼 흔한 실패는 해결 방법까지 알려준다 */
 function browserHint(e) {
   const m = String(e?.message || e);
@@ -673,13 +775,40 @@ function ensureDir(p) {
 }
 
 io.on('connection', socket => {
-  socket.on('join', scanId => {
-    socket.join(scanId);
-    // 입장 전에 쌓인 이벤트를 재생해 로그 유실을 막는다
-    const scan = scans.get(scanId);
-    if (scan) scan.events.forEach(({ event, data }) => socket.emit(event, data));
+  /**
+   * 검사 진행을 받아 보기 시작한다. afterSeq 를 주면 그 다음 이벤트부터만 다시 보낸다
+   * (연결이 끊겼다 다시 붙은 경우). 서버가 다시 시작돼 검사를 모르면 그렇다고 알린다 —
+   * 알리지 않으면 화면이 "검사 중" 에 멈춰 있게 된다.
+   */
+  socket.on('join', (scanId, afterSeq) => {
+    const id = String(scanId || '');
+    const scan = scans.get(id);
+    if (!scan) {
+      socket.emit('scanError', { scanId: id, msg: '서버에서 이 검사를 찾을 수 없습니다. 서버가 다시 시작됐을 수 있습니다. 다시 검사해 주세요.' });
+      return;
+    }
+    socket.join(id);
+    const from = Number(afterSeq) || 0;
+    scan.events.filter(e => e.data.seq > from).forEach(({ event, data }) => socket.emit(event, data));
   });
 });
+
+/* ── 오류 응답 ── */
+
+// 잘못된 JSON 본문·큰 요청 등은 화면이 읽을 수 있는 JSON 오류로 돌려준다
+app.use((err, req, res, next) => {   // 인자 4개여야 Express 가 오류 처리기로 인식한다
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) console.error('요청 처리 오류:', err);
+  if (res.headersSent) return;
+  res.status(status).json({
+    error: err.type === 'entity.parse.failed' ? '요청 형식이 올바르지 않습니다.'
+      : err.type === 'entity.too.large' ? '요청이 너무 큽니다.'
+      : status >= 500 ? '서버에서 요청을 처리하지 못했습니다.' : String(err.message || '요청을 처리하지 못했습니다.'),
+  });
+});
+
+// 놓친 비동기 오류 하나로 서버 전체(다른 사람의 검사까지)가 내려가지 않게 한다
+process.on('unhandledRejection', e => console.error('처리되지 않은 오류:', e));
 
 /** 같은 네트워크의 동료가 접속할 수 있는 주소들 */
 function lanAddresses() {

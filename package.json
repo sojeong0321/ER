@@ -6,7 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "scan": "node scan.js",
-    "test": "node test/verify.js && node test/verify-login.js",
+    "test": "node test/verify-unit.js && node test/verify.js && node test/verify-buggy.js && node test/verify-login.js && node test/verify-server.js && node test/verify-ui.js",
+    "test:unit": "node test/verify-unit.js",
+    "test:buggy": "node test/verify-buggy.js",
+    "test:server": "node test/verify-server.js",
+    "test:ui": "node test/verify-ui.js",
     "postinstall": "playwright install chromium",
     "login": "node login.js",
     "test:login": "node test/verify-login.js"
