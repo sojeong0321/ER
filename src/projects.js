@@ -233,7 +233,7 @@ function update(id, patch = {}) {
   if (patch.rules && typeof patch.rules === 'object') {
     const r = patch.rules, next = { ...p.rules };
     const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n >= lo && n <= hi ? n : null; };
-    if ('observeMs' in r) { const n = num(r.observeMs, 300, 60000); if (n === null) throw new Error('관찰 시간은 300~60000ms 사이여야 합니다.'); next.observeMs = n; }
+    if ('observeMs' in r) { const n = num(r.observeMs, 300, 60000); if (n === null) throw new Error('반응 기다리는 시간은 0.3~60초 사이여야 합니다.'); next.observeMs = n; }
     if ('maxPages' in r) { const n = num(r.maxPages, 1, 1000); if (n === null) throw new Error('최대 페이지 수는 1~1000 사이여야 합니다.'); next.maxPages = n; }
     if ('scope' in r && SCOPES.includes(r.scope)) next.scope = r.scope;
     if (Array.isArray(r.excludeRules)) {

@@ -162,11 +162,17 @@
   .urlrows .x:hover{color:var(--er)}
   .dangerbtn{color:var(--er);font-size:12.5px;margin-left:auto}
   .dangerbtn:hover{text-decoration:underline}
-  .more{margin-left:auto;font-size:13px;color:var(--ink-500);display:inline-flex;align-items:center;gap:6px}
-  .more:hover{color:var(--brand-700)}
+  /* 세부 설정 열기 — 눌러서 펼치는 버튼임이 보이도록 테두리·아이콘·방향 화살표를 둔다 */
+  .more{margin-left:auto;font-size:13px;font-weight:550;color:var(--ink-600);display:inline-flex;align-items:center;gap:7px;
+    border:1px solid var(--line);border-radius:8px;padding:7px 12px;background:var(--card);transition:border-color .12s,background .12s,color .12s}
+  .more svg{width:15px;height:15px;flex-shrink:0}
+  .more .chev{width:14px;height:14px;transition:transform .15s;color:var(--ink-400)}
+  .more:hover{border-color:var(--brand);color:var(--brand-700)}
+  .more[aria-expanded=true]{border-color:var(--brand);background:var(--brand-bg);color:var(--brand-700)}
+  .more[aria-expanded=true] .chev{transform:rotate(180deg);color:var(--brand-700)}
 
   /* ── 세부 설정 ── */
-  .adv{display:none;margin-top:14px;padding-top:16px;border-top:1px solid var(--line-2)}
+  .adv{display:none;margin-top:12px;padding:16px 18px;border:1px solid var(--line);border-radius:10px;background:var(--ink-50)}
   .adv.open{display:block}
   .advgrid{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end}
   .fld{display:flex;flex-direction:column;gap:6px}
@@ -174,6 +180,10 @@
   .fld input{border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:13.5px;background:var(--card)}
   .fld input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-bg)}
   .fld.wide input{min-width:260px}
+  .fld .unit{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-500)}
+  .fld .unit input{color:var(--ink-900)}   /* 단위 글자색을 물려받아 값이 placeholder 처럼 흐려 보이지 않도록 */
+  .fldnote{font-size:12px;color:var(--ink-400);line-height:1.6;margin-top:10px;max-width:640px}
+  .fldnote b{color:var(--ink-600);font-weight:600}
   .opt{color:var(--ink-400);font-weight:400}
   .chk{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-600);cursor:pointer;padding-bottom:9px}
   .chk input{width:15px;height:15px;accent-color:var(--brand)}
@@ -306,8 +316,14 @@
   .pgroup{margin:0 18px 14px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .pgtitle{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:11px 14px;background:var(--ink-50);
     border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
-  .pgtitle .caret{width:11px;color:var(--ink-400);transition:transform .15s;font-size:10px}
+  .pgtitle .caret{width:16px;height:16px;flex-shrink:0;color:var(--ink-500);transition:transform .15s}
   .pgtitle[aria-expanded=false] .caret{transform:rotate(-90deg)}
+  /* 오른쪽 끝의 접기·펼치기 표시 — 제목 줄 전체가 눌리는 버튼임을 알린다 */
+  .pgtitle .fold{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-size:11.5px;font-weight:550;color:var(--ink-500);
+    border:1px solid var(--line);border-radius:6px;padding:2px 7px 2px 8px;background:var(--card)}
+  .pgtitle .fold svg{width:12px;height:12px;transition:transform .15s}
+  .pgtitle[aria-expanded=false] .fold svg{transform:rotate(180deg)}
+  .pgtitle:hover .fold{border-color:var(--brand);color:var(--brand-700)}
   .pgtitle[aria-expanded=false]{border-bottom:none}
   .pgtitle .u{font-family:var(--mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .pgtitle .n{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-400);white-space:nowrap}
@@ -503,18 +519,25 @@
                   <button data-s="path" aria-pressed="true">하위 경로까지</button>
                   <button data-s="domain" aria-pressed="false">사이트 전체</button>
                 </div>
-                <button class="more" id="moreBtn" aria-expanded="false">＋ 세부 설정</button>
+                <button type="button" class="more" id="moreBtn" aria-expanded="false" aria-controls="adv">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+                  <span class="lbl">세부 설정 열기</span>
+                  <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
               </div>
 
               <div class="adv" id="adv">
                 <div class="advgrid">
-                  <label class="fld"><span>요소당 관찰 시간</span><input id="observeMs" type="number" value="2000" min="300" step="100" style="width:110px"></label>
+                  <label class="fld"><span>반응 기다리는 시간</span>
+                    <span class="unit"><input id="observeMs" type="number" value="2" min="0.3" max="60" step="0.1" style="width:90px" aria-describedby="observeNote">초</span></label>
                   <label class="fld"><span>최대 페이지 수</span><input id="maxPages" type="number" value="50" min="1" style="width:100px"></label>
                   <label class="fld wide"><span>클릭하지 않을 단어 <span class="opt">(쉼표로 구분)</span></span><input id="excl" value="삭제, 탈퇴, 결제, 로그아웃, 구매, 주문" placeholder="삭제, 발송, 승인" spellcheck="false"></label>
                   <label class="chk" title="새 창으로 열리는 링크를 눌러봅니다. 결제창처럼 새 창이 떠야 정상인 화면을 확인할 때 켜세요. 창은 열리자마자 닫습니다."><input type="checkbox" id="clickNewTab"> 새 창 링크도 검사</label>
                   <label class="chk" title="다른 사이트로 나가는 링크까지 눌러봅니다. 검사 시간이 늘고 외부 사이트에 접속하게 됩니다."><input type="checkbox" id="clickExternal"> 외부 링크도 검사</label>
                 </div>
-                <p class="hint" style="margin-top:10px">여기서 바꾼 값은 <b>이번 검사에만</b> 쓰입니다. 계속 쓰려면 프로젝트 설정에서 저장하세요.</p>
+                <p class="fldnote" id="observeNote"><b>반응 기다리는 시간</b> — 버튼을 누른 뒤 화면 변화·서버 요청 같은 반응을 최대 이만큼 기다립니다.
+                  그 안에 아무 변화가 없으면 <b>무감</b>으로 판정합니다. 반응이 느린 화면이라 무감이 많이 나오면 늘려 보세요. (반응이 오면 바로 다음으로 넘어가므로 늘려도 검사가 그만큼 느려지지는 않습니다)</p>
+                <p class="hint" style="margin-top:8px">여기서 바꾼 값은 <b>이번 검사에만</b> 쓰입니다. 계속 쓰려면 프로젝트 설정에서 저장하세요.</p>
               </div>
 
               <div class="scansum" id="scanSum"></div>
@@ -547,6 +570,7 @@
                 </div>
               </div>
               <div class="striptrack" id="liveStrip"></div>
+              <div class="maphint">칸을 누르면 그 요소의 판정 근거와 결함 화면을 바로 볼 수 있습니다.</div>
             </div>
           </section>
 
@@ -672,7 +696,8 @@
               <div class="setsec">
                 <h3>검사 기본값</h3>
                 <div class="advgrid">
-                  <label class="fld"><span>요소당 관찰 시간 (ms)</span><input id="setObserve" type="number" min="300" max="60000" step="100" style="width:130px"></label>
+                  <label class="fld"><span>반응 기다리는 시간</span>
+                    <span class="unit"><input id="setObserve" type="number" min="0.3" max="60" step="0.1" style="width:100px">초</span></label>
                   <label class="fld"><span>최대 페이지 수</span><input id="setMaxPages" type="number" min="1" max="1000" style="width:110px"></label>
                   <label class="fld"><span>기본 검사 범위</span>
                     <select id="setScope" style="border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:13.5px;background:var(--card)">
@@ -687,6 +712,7 @@
                   <label class="chk" style="padding:0" title="다른 사이트로 나가는 링크까지 눌러봅니다. 검사 시간이 늘고 외부 사이트에 접속하게 됩니다."><input type="checkbox" id="setExternal"> 외부 링크도 검사</label>
                   <label class="chk" style="padding:0" title="사내 개발 서버는 정식 인증서가 없어 브라우저가 '안전하지 않음' 경고를 띄웁니다. 켜두면 그 경고를 넘기고 검사합니다. 개발·사내 주소를 검사하려면 대부분 켜두어야 합니다."><input type="checkbox" id="setSSL"> 인증서 경고를 넘기고 검사</label>
                 </div>
+                <p class="fldnote"><b>반응 기다리는 시간</b> — 버튼을 누른 뒤 반응(화면 변화·서버 요청 등)을 최대 이만큼 기다리고, 그 안에 변화가 없으면 무감으로 판정합니다.</p>
               </div>
 
               <div class="rulefoot">
@@ -724,8 +750,8 @@
               <div class="acts">
                 <button class="btn" type="button" id="printBtn">인쇄</button>
                 <a class="btn" id="openReport" target="_blank" rel="noopener">리포트 열기</a>
-                <button class="btn primary" type="button" id="rescanBtn" title="지난 검사의 주소와 설정을 새 검사 폼에 불러옵니다. 검사는 확인 후 직접 시작하세요.">같은 설정으로</button>
-                <button class="btn" type="button" id="newScanBtn">처음 화면</button>
+                <button class="btn primary" type="button" id="rescanBtn" title="이 검사의 주소와 설정을 새 검사 폼에 불러옵니다. 검사는 확인 후 직접 시작하세요.">재검사</button>
+                <button class="btn" type="button" id="newScanBtn" title="결과를 닫고 새 검사 화면으로 돌아갑니다. 리포트는 검사 이력에 남습니다.">초기화</button>
               </div>
             </div>
 
@@ -846,6 +872,7 @@ const SIGNAL = { dom:'화면 구조', net:'서버 요청', url:'주소 이동', 
 const ORDER = { ERROR:0, 'NO-RESPONSE':1, UNCLICKABLE:2, PASS:3, EXCLUDED:4 };
 
 let DATA = [], META = {}, filter = 'ALL', picked = null, scanId = null, running = false;
+let LIVE = [];   // 검사 중에 받은 판정 — 라이브 히트맵 칸을 눌러 상세를 볼 때 쓴다
 let perPage = 50, pageNo = 1;
 const folded = new Set();   // 접어 둔 페이지 주소
 let scope = 'path', liveCount = 0;
@@ -858,11 +885,16 @@ $('scopeSeg').addEventListener('click', e => {
   scope = b.dataset.s;
   [...$('scopeSeg').children].forEach(x => x.setAttribute('aria-pressed', String(x === b)));
 });
-$('moreBtn').addEventListener('click', () => {
-  const open = $('adv').classList.toggle('open');
+function setAdvOpen(open) {
+  $('adv').classList.toggle('open', open);
   $('moreBtn').setAttribute('aria-expanded', String(open));
-  $('moreBtn').textContent = open ? '세부 설정 접기' : '세부 설정';
-});
+  $('moreBtn').querySelector('.lbl').textContent = open ? '세부 설정 닫기' : '세부 설정 열기';
+}
+$('moreBtn').addEventListener('click', () => setAdvOpen(!$('adv').classList.contains('open')));
+
+/* 반응 기다리는 시간 — 화면에서는 초로 보여주고 서버에는 ms 로 보낸다 */
+const msToSec = ms => String(Math.round(Number(ms) / 100) / 10);
+const secToMs = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.round(n * 1000) : NaN; };
 $('url').addEventListener('keydown', e => { if (e.key === 'Enter') startScan(); });
 $('goBtn').addEventListener('click', startScan);
 $('stopBtn').addEventListener('click', stopScan);
@@ -1217,7 +1249,7 @@ function paintScanSummary() {
   $('scanSum').innerHTML =
     `<span>${auth}</span>` +
     `<span>제외 단어 <b>${r.excludeRules.length}</b>개</span>` +
-    `<span>관찰 <b>${r.observeMs}</b>ms</span>` +
+    `<span>반응 대기 <b>${msToSec(r.observeMs)}</b>초</span>` +
     `<span>최대 <b>${r.maxPages}</b>페이지</span>` +
     `<button type="button" class="linkbtn" data-go="rules">프로젝트 설정 →</button>`;
 }
@@ -1254,7 +1286,7 @@ async function startScan() {
       '클릭하지 않을 단어가 비어 있습니다.\n\n' +
       'ER은 버튼을 실제로 클릭합니다. 이 상태로 검사하면 삭제·발송·승인처럼 ' +
       '되돌릴 수 없는 버튼도 눌립니다.\n\n그래도 검사를 시작할까요?');
-    if (!go) { $('adv').classList.add('open'); $('excl').focus(); return; }
+    if (!go) { setAdvOpen(true); $('excl').focus(); return; }
   }
 
   beginRunView(url, Date.now());
@@ -1265,7 +1297,7 @@ async function startScan() {
       body: JSON.stringify({
         url, projectId: P.id, scope,
         excludeRules,
-        observeMs: Number($('observeMs').value) || 2000,
+        observeMs: secToMs($('observeMs').value) || 2000,
         maxPages: Number($('maxPages').value) || 50,
         clickNewTab: $('clickNewTab').checked,
         clickExternal: $('clickExternal').checked,
@@ -1285,7 +1317,7 @@ async function startScan() {
 
 /** 진행 화면을 새로 그린다 — 새 검사를 시작할 때와, 새로고침 뒤 진행 중인 검사를 다시 이어 볼 때 */
 function beginRunView(url, since) {
-  DATA = []; filter = 'ALL'; liveCount = 0; pageSeq = 0; queuedLeft = 0; pageNo = 1; folded.clear();
+  DATA = []; LIVE = []; filter = 'ALL'; liveCount = 0; pageSeq = 0; queuedLeft = 0; pageNo = 1; folded.clear();
   liveTally = { PASS:0, ERROR:0, 'NO-RESPONSE':0, EXCLUDED:0, UNCLICKABLE:0 };
   $('errNote').classList.remove('on');
   $('term').innerHTML = '';
@@ -1396,12 +1428,16 @@ onScan('page', ({ url, visited, queued }) => {
   paintProgress(0, 0);
 });
 
-onScan('element', ({ index, total, status, label, sel, reason }) => {
+onScan('element', d => {
+  const { index, total, status, label, sel, reason } = d;
   liveCount++;
   liveTally[status] = (liveTally[status] || 0) + 1;
+  LIVE.push({ ...d, page: d.page || d.url });
 
   const cell = document.createElement('div');
   cell.className = 'cell ' + (status === 'NO-RESPONSE' ? 'NR' : status);
+  cell.dataset.i = LIVE.length - 1;
+  cell.title = `${LABEL[status] || status} — ${label || ''}`;
   $('liveStrip').appendChild(cell);
 
   const name = esc(label || '(이름 없음)');
@@ -1413,6 +1449,11 @@ onScan('element', ({ index, total, status, label, sel, reason }) => {
 
   paintLive();
   paintProgress(index + 1, total);
+});
+
+$('liveStrip').addEventListener('click', e => {
+  const cell = e.target.closest('.cell'); if (!cell) return;
+  openDetail(LIVE[Number(cell.dataset.i)], scanId);
 });
 
 function paintLive() {
@@ -1567,7 +1608,7 @@ function renderExports() {
 $('rescanBtn').addEventListener('click', () => rescan());
 
 $('newScanBtn').addEventListener('click', () => {
-  if (!confirm('지금 결과를 닫고 처음 화면으로 돌아갈까요?\n\n리포트는 검사 이력에 남아 있어 언제든 다시 열 수 있습니다.')) return;
+  if (!confirm('결과를 닫고 새 검사 화면으로 초기화할까요?\n\n리포트는 검사 이력에 남아 있어 언제든 다시 열 수 있습니다.')) return;
   forgetScan();
   hasResult = false;
   $('errNote').classList.remove('on');
@@ -1594,7 +1635,7 @@ function rescan(entry) {
       scope = st.scope;
       [...$('scopeSeg').children].forEach(x => x.setAttribute('aria-pressed', String(x.dataset.s === scope)));
     }
-    if (st.observeMs) $('observeMs').value = st.observeMs;
+    if (st.observeMs) $('observeMs').value = msToSec(st.observeMs);
     if (st.maxPages) $('maxPages').value = st.maxPages;
     if (Array.isArray(st.excludeRules)) $('excl').value = st.excludeRules.join(', ');
     $('clickNewTab').checked = !!st.clickNewTab;
@@ -1607,7 +1648,7 @@ function rescan(entry) {
   paintView();
   window.scrollTo({ top: 0, behavior: 'smooth' });
   $('url').focus();
-  toast('지난 검사 설정을 불러왔습니다. 확인하고 검사 시작을 누르세요');
+  toast('재검사할 주소와 설정을 불러왔습니다. 확인하고 검사 시작을 누르세요');
 }
 
 /* ── 최근 검사 이력 ── */
@@ -1792,7 +1833,7 @@ function fillProjectForm() {
   const r = P.rules;
   RULES = [...r.excludeRules];
   paintChips();
-  $('setObserve').value = r.observeMs;
+  $('setObserve').value = msToSec(r.observeMs);
   $('setMaxPages').value = r.maxPages;
   $('setScope').value = r.scope;
   $('setNewTab').checked = !!r.clickNewTab;
@@ -1998,7 +2039,7 @@ $('saveRules').addEventListener('click', async () => {
   const body = {
     urls, auth,
     rules: {
-      observeMs: Number($('setObserve').value),
+      observeMs: secToMs($('setObserve').value),
       maxPages: Number($('setMaxPages').value),
       scope: $('setScope').value,
       excludeRules: RULES,
@@ -2048,7 +2089,7 @@ $('deleteProject').addEventListener('click', async () => {
 function applyDefaultsToForm() {
   if (!P) return;
   const r = P.rules;
-  $('observeMs').value = r.observeMs;
+  $('observeMs').value = msToSec(r.observeMs);
   $('maxPages').value = r.maxPages;
   $('excl').value = r.excludeRules.join(', ');
   $('clickNewTab').checked = !!r.clickNewTab;
@@ -2197,9 +2238,10 @@ function headerHtml(page, all, isFolded, shownCount) {
     : `요소 ${all.length}개`;
   return `<div class="pgroup">
     <button class="pgtitle" type="button" data-page="${esc(page)}" aria-expanded="${!isFolded}">
-      <span class="caret">▾</span>
+      <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
       <span class="u">${hi(page)}</span>
       <span class="n">${bad ? `<span style="color:var(--er)">결함 ${bad}건</span> · ` : ''}${note}</span>
+      <span class="fold">${isFolded ? '펼치기' : '접기'}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></span>
     </button>`;
 }
 
@@ -2213,8 +2255,11 @@ function itemHtml(d) {
 }
 
 /* ── 상세 패널 ── */
-function openSide(i) {
-  const d = DATA[i]; if (!d) return;
+function openSide(i) { openDetail(DATA[i], META.scanId); }
+
+/** 요소 하나의 상세를 연다. 검사 중(라이브 히트맵)에도 쓰므로 스크린샷은 넘겨받은 검사 번호로 찾는다. */
+function openDetail(d, sid) {
+  if (!d) return;
   picked = d;
   $('sTitle').textContent = d.label;
   $('sSel').textContent = d.sel;
@@ -2227,8 +2272,8 @@ function openSide(i) {
           return `<span class="sig ${bad ? 'bad' : on ? 'on' : ''}">${name} ${on ? '있음' : '없음'}</span>`;
         }).join('')}</div></div>` : '';
 
-  const shotUrl = d.screenshot && META.scanId
-    ? `/reports/${META.scanId}/shots/${encodeURIComponent(d.screenshot)}` : null;
+  const shotUrl = d.screenshot && sid
+    ? `/reports/${encodeURIComponent(sid)}/shots/${encodeURIComponent(d.screenshot)}` : null;
   const shot = shotUrl
     ? `<div class="block"><h3>결함 발생 화면</h3>
         <div class="shotwrap">
@@ -2313,7 +2358,7 @@ function copyTicket() {
     `페이지: ${picked.page}`,
     `선택자: ${picked.sel}`,
     `증상: ${picked.reason || ''}`,
-    `검사 시각: ${META.scannedAt || ''}`,
+    `검사 시각: ${running ? '검사 중' : META.scannedAt || ''}`,
   ].join('\n');
   copyText(text, '이슈에 붙여넣을 형식으로 복사했습니다');
 }

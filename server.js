@@ -665,10 +665,8 @@ async function runScan(scanId, options) {
 
     const results = await crawl(browser, url, scope, ev => {
       if (ev.type === 'page') emit('page', { url: ev.url, visited: ev.visited, queued: ev.queued });
-      if (ev.type === 'element') emit('element', {
-        url: ev.url, index: ev.index, total: ev.total,
-        status: ev.result.status, label: ev.result.label, sel: ev.result.sel, reason: ev.result.reason,
-      });
+      // 판정 결과를 통째로 보낸다 — 검사 중에도 히트맵 칸을 눌러 상세(신호·스크린샷)를 볼 수 있도록
+      if (ev.type === 'element') emit('element', { ...ev.result, url: ev.url, index: ev.index, total: ev.total });
       if (ev.type === 'done') emit('pageResult', { url: ev.url, count: ev.count });
       if (ev.type === 'ready') emit('log', { msg: `화면이 준비됐습니다 — 클릭할 수 있는 요소 ${ev.count}개` });
       if (ev.type === 'redirected') emit('log', { msg: `주소가 넘겨졌습니다 — ${ev.from} → ${ev.to}` });

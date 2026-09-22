@@ -70,6 +70,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     check(await pg.isVisible('#historyBlank'), '기록이 없으면 빈 화면 안내를 보여준다');
     await pg.click('.navitem[data-nav="dash"]');
 
+    section('세부 설정');
+    await pg.click('#moreBtn');
+    const advOpen = await pg.isVisible('#adv') && (await pg.getAttribute('#moreBtn', 'aria-expanded')) === 'true' &&
+      /닫기/.test(await pg.textContent('#moreBtn'));
+    await pg.click('#moreBtn');
+    check(advOpen && !(await pg.isVisible('#adv')) && /열기/.test(await pg.textContent('#moreBtn')), '세부 설정 버튼으로 열고 닫는다');
+    check((await pg.inputValue('#observeMs')) === '2' && /반응 대기 <b>2<\/b>초/.test(await pg.innerHTML('#scanSum')),
+      '반응 기다리는 시간을 초 단위로 보여준다');
+
     section('입력 확인');
     await pg.fill('#url', 'example.com');
     await pg.press('#url', 'Enter');
@@ -96,6 +105,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     check(/끊겼습니다/.test(await pg.textContent('#term')), '연결이 끊긴 사실을 로그에 남긴다');
 
     section('결과 화면');
+    check((await pg.textContent('#rescanBtn')).trim() === '재검사' && (await pg.textContent('#newScanBtn')).trim() === '초기화',
+      '결과 화면 버튼 이름이 재검사·초기화다');
+    const fold0 = await pg.textContent('#list .pgtitle .fold');
+    await pg.click('#list .pgtitle');
+    const fold1 = await pg.textContent('#list .pgtitle .fold');
+    const exp1 = await pg.getAttribute('#list .pgtitle', 'aria-expanded');
+    await pg.click('#list .pgtitle');
+    check(fold0.trim() === '접기' && fold1.trim() === '펼치기' && exp1 === 'false',
+      '페이지 묶음 제목에 접기·펼치기 표시가 있고 누르면 바뀐다', `${fold0} → ${fold1} (${exp1})`);
     const tabs = await pg.$$eval('#tabs .tab', t => t.map(x => x.textContent.replace(/\s+/g, '')));
     check(tabs[0].startsWith('전체') && tabs.some(t => t.startsWith('무감1')), '판정별 탭과 개수를 보여준다', tabs.join(' '));
     await pg.click('#tabs .tab[data-f="NO-RESPONSE"]');
@@ -149,6 +167,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await pg.click('#goBtn');
     await pg.waitForFunction(() => ['liveOk', 'liveEr', 'liveNr'].reduce((n, id) => n + Number(document.getElementById(id).textContent), 0) >= 3,
       null, { timeout: 60000 });
+    // 검사 중에도 히트맵 칸을 눌러 상세를 본다
+    await pg.waitForSelector('#liveStrip .cell.NR', { timeout: 60000 });
+    await pg.click('#liveStrip .cell.NR');
+    await pg.waitForSelector('#side.on #sBody img.shot', { timeout: 5000 }).catch(() => {});
+    const liveShot = await pg.$eval('#sBody img.shot', img => img.complete ? img.naturalWidth > 0
+      : new Promise(r => { img.onload = () => r(img.naturalWidth > 0); img.onerror = () => r(false); })).catch(() => false);
+    check((await S()).running && /무감/.test(await pg.textContent('#sBody')) && liveShot,
+      '검사 중에도 라이브 히트맵 칸을 누르면 상세와 결함 화면이 열린다');
+    await pg.keyboard.press('Escape');
     const before = await liveDone();
     await pg.reload();
     await pg.waitForFunction(() => running && !document.getElementById('run').hidden, null, { timeout: 15000 }).catch(() => {});
@@ -183,11 +210,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     check(/http/.test((await S()).toast), '잘못된 주소는 저장하지 않고 알린다');
     await pg.fill('#urlRows .row:last-child .lb', '시작');
     await pg.fill('#urlRows .row:last-child .u', `${BASE}/test-crawl/start.html`);
-    await pg.fill('#setObserve', '1500');
+    await pg.fill('#setObserve', '1.5');
     await pg.click('#saveRules');
     await pg.waitForFunction(() => P.urls.length === 1 && P.rules.observeMs === 1500);
     await pg.click('.navitem[data-nav="dash"]');
-    check((await pg.inputValue('#url')).endsWith('/test-crawl/start.html') && (await pg.inputValue('#observeMs')) === '1500',
+    check((await pg.inputValue('#url')).endsWith('/test-crawl/start.html') && (await pg.inputValue('#observeMs')) === '1.5',
       '저장한 주소와 규칙이 새 검사 폼에 반영된다');
     await pg.click('.navitem[data-nav="history"]');
     check(await pg.isVisible('#historyBlank'), '새 프로젝트의 이력은 비어 있다 (다른 프로젝트 기록이 섞이지 않는다)');
