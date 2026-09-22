@@ -954,6 +954,27 @@ function storePid(id) { try { localStorage.setItem(PID_KEY, id); } catch {} }
 const fmtDate = iso => iso ? new Date(iso).toLocaleString('ko-KR') : '';
 const pidPath = () => `/api/projects/${encodeURIComponent(P.id)}`;
 
+/* ── 화면별 주소 — /p/<프로젝트>[/history|/rules] ── */
+const VIEWS = ['dash', 'history', 'rules'];
+function parseRoute() {
+  const m = location.pathname.match(/^\/p\/([^/]+)(?:\/([^/]+))?\/?$/);
+  if (!m) return { pid: null, view: 'dash' };
+  let pid = null;
+  try { pid = decodeURIComponent(m[1]); } catch {}
+  return { pid, view: VIEWS.includes(m[2]) ? m[2] : 'dash' };
+}
+const ROUTE = parseRoute();
+function viewUrl() {
+  return `/p/${encodeURIComponent(P.id)}${view === 'dash' ? '' : '/' + view}`;
+}
+/** 지금 프로젝트·화면을 주소창에 맞춘다. push 면 뒤로가기로 돌아올 수 있게 기록을 남긴다 */
+function syncUrl(push) {
+  if (!P) return;
+  const url = viewUrl();
+  if (location.pathname === url) return;
+  history[push ? 'pushState' : 'replaceState'](null, '', url);
+}
+
 async function loadProjects(selectId) {
   try {
     const list = await fetch('/api/projects').then(r => r.json());
@@ -966,6 +987,8 @@ async function loadProjects(selectId) {
   paintProjects();
   if (changed) onProjectChanged();
   else { paintScanSummary(); paintUrlChips(); }
+  // 없는 프로젝트 주소로 들어왔거나 지운 뒤라면 실제로 연 프로젝트 주소로 바꿔 둔다
+  syncUrl(false);
 }
 
 const ICON_BOLT = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>';
@@ -1055,7 +1078,7 @@ $('projOpts').addEventListener('click', e => {
   selectProject(b.dataset.id);
 });
 
-function selectProject(id) {
+function selectProject(id, push = true) {
   if (id === P?.id) return;
   if (running) { toast('검사가 끝난 뒤 프로젝트를 바꿀 수 있습니다'); return; }
   const next = PROJECTS.find(x => x.id === id);
@@ -1063,6 +1086,7 @@ function selectProject(id) {
   P = next;
   paintProjects();
   onProjectChanged();
+  syncUrl(push);
 }
 
 /** 목록의 프로젝트 하나를 서버가 돌려준 최신 값으로 바꾼다 */
@@ -1559,7 +1583,7 @@ function loadRunner() {
   }).catch(() => {});
 }
 loadRunner();
-loadProjects();
+loadProjects(ROUTE.pid);
 
 /**
  * 서버에 화면이 없으면 "직접 로그인" 창을 띄워도 아무도 볼 수 없다.
@@ -1585,7 +1609,7 @@ function paintWindowSupport(canOpen, host) {
 }
 
 /* ── 좌측 내비 — 화면을 실제로 바꾼다 ── */
-let view = 'dash';
+let view = ROUTE.view;
 let hasResult = false;
 
 /**
@@ -1613,13 +1637,24 @@ function paintView() {
   $('crumb').innerHTML = `<span class="cp">${esc(P?.name || 'ER')} / </span><b>${title}</b>`;
 }
 
-function navigate(to) {
+function navigate(to, push = true) {
   view = to;
   if (to === 'history') renderHistoryView();
   if (to === 'rules') fillProjectForm();
   paintView();
+  syncUrl(push);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+/* 뒤로가기·앞으로가기 — 주소에 맞는 프로젝트와 화면을 연다 */
+window.addEventListener('popstate', () => {
+  const r = parseRoute();
+  if (r.pid && r.pid !== P?.id) {
+    if (running) { toast('검사가 끝난 뒤 프로젝트를 바꿀 수 있습니다'); syncUrl(false); return; }
+    selectProject(r.pid, false);
+  }
+  navigate(r.view, false);
+});
 
 document.querySelector('.navlist').addEventListener('click', e => {
   const b = e.target.closest('.navitem'); if (!b) return;

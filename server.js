@@ -46,6 +46,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/reports', express.static(path.join(__dirname, 'reports')));
 
 /**
+ * 화면별 주소 — /p/<프로젝트>, /p/<프로젝트>/history, /p/<프로젝트>/rules.
+ * 화면 전환은 브라우저가 하지만, 새로고침하거나 링크로 바로 들어와도 같은 화면이 열리도록 앱을 돌려준다.
+ */
+app.get(['/p/:pid', '/p/:pid/:view(history|rules)'], (req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+/**
  * 리포트 파일이 없을 때 안내한다.
  * 서버를 다시 시작했거나 오래된 기록이 정리되면 화면에는 링크가 남아 있어도 파일은 없다.
  * 기본 404 는 "Cannot GET ..." 만 보여줘 무슨 상황인지 알 수 없다.
